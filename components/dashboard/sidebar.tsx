@@ -40,9 +40,9 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r bg-background">
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <TrendingUp className="h-6 w-6" />
-          <span className="text-lg font-bold">FastKeep</span>
+        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+          <BookOpen className="h-6 w-6 text-primary" />
+          <span className="text-lg font-bold">VinBook</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-1 p-4">

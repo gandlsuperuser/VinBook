@@ -39,7 +39,7 @@ const HERMES_TOOLS = [
     type: "function",
     function: {
       name: "create_customer",
-      description: "Create a new customer in FastKeep",
+      description: "Create a new customer in VinBook",
       parameters: {
         type: "object",
         properties: {
@@ -71,8 +71,8 @@ const HERMES_TOOLS = [
 
 export async function GET() {
   return Response.json({
-    name: "fastkeep-hermes-agent",
-    description: "Hermes Agent tools integration for FastKeep",
+    name: "vinbook-hermes-agent",
+    description: "Hermes Agent tools integration for VinBook",
     tools: HERMES_TOOLS,
   });
 }

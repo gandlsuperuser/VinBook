@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FastKeep - Accounting SaaS",
-  description: "QuickBooks-like accounting and financial management platform",
+  title: "VinBook - Modern Commercial Accounting & Invoicing SaaS",
+  description: "Comprehensive cloud accounting, double-entry bookkeeping, and financial management platform",
 };
 
 export default function RootLayout({

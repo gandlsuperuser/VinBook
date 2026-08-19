@@ -104,10 +104,10 @@ async function main() {
   // Create admin user (you'll need to set a password hash)
   // Note: In production, use bcrypt to hash passwords
   const adminUser = await prisma.user.upsert({
-    where: { email: "admin@fastkeep.com" },
+    where: { email: "admin@vinbook.com" },
     update: {},
     create: {
-      email: "admin@fastkeep.com",
+      email: "admin@vinbook.com",
       name: "Admin User",
       role: UserRole.ADMIN,
       organizationId: organization.id,

@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VinBook - Commercial Accounting & Financial SaaS Platform
 
-## Getting Started
+VinBook is a modern, enterprise-grade cloud accounting and double-entry bookkeeping platform built with Next.js 16, TypeScript, Tailwind CSS, Prisma, and PostgreSQL (Neon).
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Dashboard & Financial KPIs**: Real-time revenue overview, expense breakdowns, and key performance indicators.
+- **Invoicing & Estimates**:
+  - Full invoice lifecycle (Draft, Sent, Paid, Partial, Overdue, Cancelled)
+  - Estimate/Quote conversion to invoice
+  - PDF export and automated tax calculations
+- **Double-Entry General Ledger**:
+  - Hierarchical Chart of Accounts (Assets, Liabilities, Equity, Revenue, Expense)
+  - Balanced debit/credit journal entries
+- **Banking & Reconciliation**:
+  - Multi-bank account support
+  - Transaction import and automatic invoice/expense matching
+- **Customer & Vendor CRM**:
+  - Credit limit management, payment terms, and prepaid balances
+  - Detailed customer financial statements
+- **Multi-Tenant Organizations**:
+  - Secure tenant separation with role-based access control (Admin, Accountant, Viewer)
+- **API & Protocol Integration**:
+  - Model Context Protocol (MCP) server support (`/api/mcp`)
+  - Hermes Agent protocol integration (`/api/hermes`)
+
+---
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 16 (App Router) & React 19
+- **Database & ORM**: PostgreSQL (Neon Serverless) & Prisma Client
+- **Auth**: NextAuth.js v5
+- **UI Components**: Radix UI, Tailwind CSS, Lucide Icons, Recharts
+
+---
+
+## ⚙️ Environment Variables
+
+Create a `.env` file or configure your environment variables in Vercel:
+
+```env
+# Database (Neon PostgreSQL)
+DATABASE_URL="postgresql://<user>:<password>@<host>/<dbname>?sslmode=require"
+
+# NextAuth
+NEXTAUTH_SECRET="your-32-character-secret" # Generate with: openssl rand -base64 32
+NEXTAUTH_URL="https://vinbook.vercel.app"
+
+# Optional: OAuth
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+GITHUB_CLIENT_ID=""
+GITHUB_CLIENT_SECRET=""
+
+# Optional: Resend for Emails
+RESEND_API_KEY=""
+EMAIL_FROM="VinBook <onboarding@resend.dev>"
+
+# Optional: Stripe for Subscriptions
+STRIPE_SECRET_KEY=""
+STRIPE_WEBHOOK_SECRET=""
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 💻 Local Development
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Install dependencies
+npm install
 
-## Learn More
+# Generate Prisma Client
+npx prisma generate
 
-To learn more about Next.js, take a look at the following resources:
+# Push database schema to Neon
+npx prisma db push
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Seed initial chart of accounts and default organization
+npm run db:seed
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Start development server
+npm run dev
+```

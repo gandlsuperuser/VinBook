@@ -317,7 +317,7 @@ export default function CustomerDetailPage() {
         <!-- Footer -->
         <div style="margin-top: 20px; padding-top: 12px; border-top: 1px solid #000000; font-size: 8px; color: #000000; text-align: center; font-weight: 600; line-height: 1.3;">
           <div style="margin-bottom: 4px; line-height: 1.2;">This report was generated on ${new Date().toLocaleString()}</div>
-          <div style="font-weight: 700; color: #000000; font-size: 9px; line-height: 1.2;">FastKeep Accounting System</div>
+          <div style="font-weight: 700; color: #000000; font-size: 9px; line-height: 1.2;">VinBook Accounting System</div>
         </div>
       `;
 

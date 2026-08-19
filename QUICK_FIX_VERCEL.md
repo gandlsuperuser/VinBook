@@ -14,7 +14,7 @@ Copy the output (it will be a long random string).
 
 ### Step 2: Go to Vercel Dashboard
 1. Visit: https://vercel.com/dashboard
-2. Click on your project: **fast-keep**
+2. Click on your project: **vinbook**
 3. Go to **Settings** → **Environment Variables**
 
 ### Step 3: Add These 3 Variables
@@ -26,7 +26,7 @@ Copy the output (it will be a long random string).
 
 **Variable 2:**
 - **Name:** `NEXTAUTH_URL`
-- **Value:** `https://fast-keep.vercel.app`
+- **Value:** `https://vinbook.vercel.app`
 - **Environment:** ✅ Production ✅ Preview ✅ Development
 
 **Variable 3:**
@@ -41,7 +41,7 @@ Copy the output (it will be a long random string).
 4. Wait for deployment to complete
 
 ### Step 5: Test
-Visit: https://fast-keep.vercel.app/login
+Visit: https://vinbook.vercel.app/login
 The configuration error should be gone!
 
 ## Still Not Working?

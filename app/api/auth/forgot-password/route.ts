@@ -69,17 +69,17 @@ export async function POST(request: Request) {
     if (process.env.RESEND_API_KEY) {
       try {
         const resend = new Resend(process.env.RESEND_API_KEY);
-        const fromEmail = process.env.EMAIL_FROM || "FastKeep <onboarding@resend.dev>";
+        const fromEmail = process.env.EMAIL_FROM || "VinBook <onboarding@resend.dev>";
         
         await resend.emails.send({
           from: fromEmail,
           to: user.email,
-          subject: "Reset your FastKeep password",
+          subject: "Reset your VinBook password",
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 8px;">
               <h2 style="color: #111827; font-size: 20px; font-weight: bold; margin-bottom: 16px;">Reset Your Password</h2>
               <p style="color: #374151; font-size: 14px; line-height: 1.5; margin-bottom: 16px;">Hi ${user.name || "there"},</p>
-              <p style="color: #374151; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">We received a request to reset your password for your FastKeep account. Click the button below to choose a new password. This link will expire in 1 hour.</p>
+              <p style="color: #374151; font-size: 14px; line-height: 1.5; margin-bottom: 24px;">We received a request to reset your password for your VinBook account. Click the button below to choose a new password. This link will expire in 1 hour.</p>
               <div style="margin-bottom: 24px;">
                 <a href="${resetLink}" style="background-color: #0f172a; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
               </div>

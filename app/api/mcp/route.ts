@@ -7,10 +7,10 @@ import {
 import { prisma } from "@/db/prisma";
 
 // Helper function to build MCP Server instance
-function createFastKeepMCPServer() {
+function createVinBookMCPServer() {
   const server = new Server(
     {
-      name: "fastkeep-mcp",
+      name: "vinbook-mcp",
       version: "1.0.0",
     },
     {
@@ -51,7 +51,7 @@ function createFastKeepMCPServer() {
         },
         {
           name: "create_customer",
-          description: "Create a new customer in FastKeep",
+          description: "Create a new customer in VinBook",
           inputSchema: {
             type: "object",
             properties: {
@@ -217,7 +217,7 @@ export async function GET(req: Request) {
       } as any;
 
       transport = new SSEServerTransport("/api/mcp/message", res);
-      const server = createFastKeepMCPServer();
+      const server = createVinBookMCPServer();
       server.connect(transport).catch((err) => controller.error(err));
     },
   });
@@ -235,7 +235,7 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   if (body.method === "tools/list") {
-    const server = createFastKeepMCPServer();
+    const server = createVinBookMCPServer();
     return Response.json({
       jsonrpc: "2.0",
       id: body.id,
@@ -268,7 +268,7 @@ export async function POST(req: Request) {
           },
           {
             name: "create_customer",
-            description: "Create a new customer in FastKeep",
+            description: "Create a new customer in VinBook",
             inputSchema: {
               type: "object",
               properties: {
@@ -385,6 +385,6 @@ export async function POST(req: Request) {
   return Response.json({
     jsonrpc: "2.0",
     id: body.id,
-    result: { message: "FastKeep MCP JSON-RPC Server" },
+    result: { message: "VinBook MCP JSON-RPC Server" },
   });
 }

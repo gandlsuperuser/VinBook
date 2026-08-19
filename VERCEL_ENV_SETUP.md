@@ -16,7 +16,7 @@ Or use an online generator: https://generate-secret.vercel.app/32
 
 **In Vercel:**
 1. Go to your project settings: https://vercel.com/dashboard
-2. Select your project: `fast-keep`
+2. Select your project: `vinbook`
 3. Go to Settings → Environment Variables
 4. Add:
    - **Name:** `NEXTAUTH_SECRET`
@@ -28,7 +28,7 @@ The base URL of your application:
 
 **In Vercel:**
 - **Name:** `NEXTAUTH_URL`
-- **Value:** `https://fast-keep.vercel.app`
+- **Value:** `https://vinbook.vercel.app`
 - **Environment:** Production, Preview, Development (select all)
 
 ### 3. DATABASE_URL (Required)
@@ -61,12 +61,12 @@ If you want to enable Google or GitHub login:
 
 2. **Go to Vercel Dashboard:**
    - Visit: https://vercel.com/dashboard
-   - Select your project: `fast-keep`
+   - Select your project: `vinbook`
    - Go to Settings → Environment Variables
 
 3. **Add all required variables:**
    - `NEXTAUTH_SECRET` (generated secret)
-   - `NEXTAUTH_URL` (`https://fast-keep.vercel.app`)
+   - `NEXTAUTH_URL` (`https://vinbook.vercel.app`)
    - `DATABASE_URL` (your PostgreSQL connection string)
 
 4. **Redeploy:**

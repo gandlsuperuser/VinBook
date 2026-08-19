@@ -18,7 +18,7 @@ if (!process.env.NEXTAUTH_SECRET) {
 
 if (!process.env.NEXTAUTH_URL && process.env.NODE_ENV === "production") {
   console.warn("⚠️  NEXTAUTH_URL is not set. This may cause issues in production.");
-  console.warn("Please set NEXTAUTH_URL to your production URL (e.g., https://fast-keep.vercel.app)");
+  console.warn("Please set NEXTAUTH_URL to your production URL (e.g., https://vinbook.vercel.app)");
 }
 
 // Build providers array conditionally
