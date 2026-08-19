@@ -40,13 +40,12 @@ function LoginForm() {
 
       if (result?.error) {
         setError("Invalid email or password");
+        setIsLoading(false);
       } else {
-        router.push(callbackUrl);
-        router.refresh();
+        window.location.href = callbackUrl;
       }
     } catch (error) {
       setError("Something went wrong. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
