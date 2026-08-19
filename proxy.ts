@@ -1,4 +1,3 @@
-import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -11,7 +10,6 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
   const { pathname } = req.nextUrl;
 
   const isAuthPage =
@@ -26,13 +24,20 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Check for session token cookie (Auth.js v5 uses these cookie names)
+  const hasSessionToken =
+    req.cookies.has("__Secure-authjs.session-token") ||
+    req.cookies.has("authjs.session-token") ||
+    req.cookies.has("__Secure-next-auth.session-token") ||
+    req.cookies.has("next-auth.session-token");
+
   // If user is authenticated and tries to access auth pages, redirect to dashboard
-  if (token && isAuthPage) {
+  if (hasSessionToken && isAuthPage) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
   // Protected routes that require authentication
-  if (!token && !isAuthPage) {
+  if (!hasSessionToken && !isAuthPage) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
@@ -54,5 +59,3 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|public).*)",
   ],
 };
-
-
