@@ -79,57 +79,63 @@ export default async function DashboardPage() {
   const thirtyDaysFromNow = addDays(now, 30);
 
   // --- Revenue & Invoice Metrics ---
-  const [
-    paidInvoices,
-    sentInvoices,
-    overdueInvoices,
-    recentPayments,
-    expenses,
-    bankAccounts,
-  ] = await Promise.all([
-    // All paid invoices total
-    prisma.invoice.findMany({
-      where: { organizationId: orgId, status: "PAID" },
-      select: { total: true, date: true },
-    }),
-    // Sent/partially paid invoices for upcoming
-    prisma.invoice.findMany({
-      where: {
-        organizationId: orgId,
-        status: { in: ["SENT", "PARTIAL"] },
-        dueDate: { lte: thirtyDaysFromNow },
-      },
-      include: { customer: { select: { name: true } } },
-      orderBy: { dueDate: "asc" },
-      take: 5,
-    }),
-    // Overdue invoices for alerts
-    prisma.invoice.findMany({
-      where: {
-        organizationId: orgId,
-        status: { in: ["SENT", "PARTIAL", "OVERDUE"] },
-        dueDate: { lt: now },
-      },
-      include: { customer: { select: { name: true } } },
-    }),
-    // Recent 5 payments
-    prisma.payment.findMany({
-      where: { invoice: { organizationId: orgId }, status: "COMPLETED" },
-      include: { invoice: { select: { number: true, customer: { select: { name: true } } } } },
-      orderBy: { date: "desc" },
-      take: 5,
-    }),
-    // All expenses
-    prisma.expense.findMany({
-      where: { organizationId: orgId, status: { in: ["PAID", "APPROVED", "REIMBURSED"] } },
-      select: { amount: true, category: true, date: true, description: true },
-    }),
-    // Bank accounts for cash flow
-    prisma.bankAccount.findMany({
-      where: { organizationId: orgId, isActive: true },
-      select: { balance: true },
-    }),
-  ]);
+  let paidInvoices: any[] = [];
+  let sentInvoices: any[] = [];
+  let overdueInvoices: any[] = [];
+  let recentPayments: any[] = [];
+  let expenses: any[] = [];
+  let bankAccounts: any[] = [];
+
+  try {
+    const results = await Promise.all([
+      // All paid invoices total
+      prisma.invoice.findMany({
+        where: { organizationId: orgId, status: "PAID" },
+        select: { total: true, date: true },
+      }),
+      // Sent/partially paid invoices for upcoming
+      prisma.invoice.findMany({
+        where: {
+          organizationId: orgId,
+          status: { in: ["SENT", "PARTIAL"] },
+          dueDate: { lte: thirtyDaysFromNow },
+        },
+        include: { customer: { select: { name: true } } },
+        orderBy: { dueDate: "asc" },
+        take: 5,
+      }),
+      // Overdue invoices for alerts
+      prisma.invoice.findMany({
+        where: {
+          organizationId: orgId,
+          status: { in: ["SENT", "PARTIAL", "OVERDUE"] },
+          dueDate: { lt: now },
+        },
+        include: { customer: { select: { name: true } } },
+      }),
+      // Recent 5 payments
+      prisma.payment.findMany({
+        where: { invoice: { organizationId: orgId }, status: "COMPLETED" },
+        include: { invoice: { select: { number: true, customer: { select: { name: true } } } } },
+        orderBy: { date: "desc" },
+        take: 5,
+      }),
+      // All expenses
+      prisma.expense.findMany({
+        where: { organizationId: orgId, status: { in: ["PAID", "APPROVED", "REIMBURSED"] } },
+        select: { amount: true, category: true, date: true, description: true },
+      }),
+      // Bank accounts for cash flow
+      prisma.bankAccount.findMany({
+        where: { organizationId: orgId, isActive: true },
+        select: { balance: true },
+      }),
+    ]);
+
+    [paidInvoices, sentInvoices, overdueInvoices, recentPayments, expenses, bankAccounts] = results;
+  } catch (dbErr) {
+    console.error("Error fetching dashboard metrics:", dbErr);
+  }
 
   // Calculate totals
   const totalRevenue = paidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
