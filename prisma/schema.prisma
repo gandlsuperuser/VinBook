@@ -1,0 +1,520 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and authorization
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  name           String?
+  emailVerified  DateTime?
+  image          String?
+  password       String? // Hashed password for email/password auth
+  role           UserRole      @default(VIEWER)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // NextAuth relations
+  accounts       Account[]
+  sessions       Session[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+// NextAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// NextAuth Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// NextAuth VerificationToken model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  ADMIN
+  ACCOUNTANT
+  VIEWER
+}
+
+// Organization model for multi-tenancy
+model Organization {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  settings     Json? // Store organization-specific settings
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  users        User[]
+  customers    Customer[]
+  vendors      Vendor[]
+  products     Product[]
+  invoices     Invoice[]
+  estimates    Estimate[]
+  expenses     Expense[]
+  ledgerAccounts LedgerAccount[]
+  ledgerEntries LedgerEntry[]
+  bankAccounts BankAccount[]
+  subscription Subscription?
+  settingsRecord Settings?
+
+  @@index([slug])
+}
+
+// Customer model
+model Customer {
+  id              String    @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  billingAddress  Json? // { street, city, state, zip, country }
+  shippingAddress Json? // { street, city, state, zip, country }
+  paymentTerms    String?  @default("Net 30") // Net 15, Net 30, Net 60, etc.
+  creditLimit     Decimal? @default(0) @db.Decimal(10, 2)
+  prepaidCredit   Decimal? @default(0) @db.Decimal(10, 2) // Manual prepaid credit/adjustment
+  taxId           String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  invoices        Invoice[]
+  estimates       Estimate[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// Vendor model
+model Vendor {
+  id            String    @id @default(cuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name          String
+  email         String?
+  phone         String?
+  address       Json? // { street, city, state, zip, country }
+  paymentTerms  String?  @default("Net 30")
+  taxId         String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  expenses      Expense[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+// Product/Service model
+model Product {
+  id            String        @id @default(cuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  sku           String?
+  type          ProductType   @default(PRODUCT)
+  price         Decimal       @default(0) @db.Decimal(10, 2)
+  cost          Decimal       @default(0) @db.Decimal(10, 2)
+  category      String?
+  inventory     Int?          // Optional inventory tracking
+  unit          String?       @default("pcs")
+  location      String?       // Optional inventory location / warehouse
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  invoiceItems  InvoiceItem[]
+  estimateItems EstimateItem[]
+
+  @@index([organizationId])
+  @@index([sku])
+  @@index([type])
+}
+
+enum ProductType {
+  PRODUCT
+  SERVICE
+}
+
+// Invoice model
+model Invoice {
+  id            String        @id @default(cuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number        String        // Invoice number (e.g., INV-001)
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  date          DateTime      @default(now())
+  dueDate       DateTime
+  status        InvoiceStatus @default(DRAFT)
+  subtotal      Decimal       @default(0) @db.Decimal(10, 2)
+  tax           Decimal       @default(0) @db.Decimal(10, 2)
+  discount      Decimal       @default(0) @db.Decimal(10, 2)
+  total         Decimal       @default(0) @db.Decimal(10, 2)
+  notes         String?
+  terms         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  items         InvoiceItem[]
+  payments      Payment[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([status])
+  @@index([date])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  PARTIAL
+  OVERDUE
+  CANCELLED
+}
+
+// Invoice Item model
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  quantity    Decimal  @default(1) @db.Decimal(10, 2)
+  rate        Decimal  @default(0) @db.Decimal(10, 2)
+  amount      Decimal  @default(0) @db.Decimal(10, 2)
+  tax         Decimal  @default(0) @db.Decimal(10, 2)
+  order       Int      @default(0) // Order of items in invoice
+
+  @@index([invoiceId])
+}
+
+// Payment model
+model Payment {
+  id          String        @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Decimal       @db.Decimal(10, 2)
+  date        DateTime      @default(now())
+  method      PaymentMethod @default(CASH)
+  reference   String?
+  status      PaymentStatus @default(COMPLETED)
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([invoiceId])
+  @@index([date])
+}
+
+enum PaymentMethod {
+  CASH
+  CHECK
+  CREDIT_CARD
+  BANK_TRANSFER
+  PREPAID_CREDIT
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Estimate/Quote model
+model Estimate {
+  id                String          @id @default(cuid())
+  organizationId    String
+  organization      Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  number            String
+  customerId        String
+  customer          Customer        @relation(fields: [customerId], references: [id])
+  date              DateTime        @default(now())
+  expiryDate        DateTime?
+  status            EstimateStatus  @default(DRAFT)
+  subtotal          Decimal         @default(0) @db.Decimal(10, 2)
+  tax               Decimal         @default(0) @db.Decimal(10, 2)
+  discount          Decimal         @default(0) @db.Decimal(10, 2)
+  total             Decimal         @default(0) @db.Decimal(10, 2)
+  convertedToInvoice Boolean        @default(false)
+  convertedInvoiceId String?
+  notes             String?
+  terms             String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  items             EstimateItem[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId])
+  @@index([customerId])
+  @@index([status])
+}
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// Estimate Item model
+model EstimateItem {
+  id          String   @id @default(cuid())
+  estimateId  String
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  description String
+  quantity    Decimal  @default(1) @db.Decimal(10, 2)
+  rate        Decimal  @default(0) @db.Decimal(10, 2)
+  amount      Decimal  @default(0) @db.Decimal(10, 2)
+  tax         Decimal  @default(0) @db.Decimal(10, 2)
+  order       Int      @default(0)
+
+  @@index([estimateId])
+}
+
+// Expense model
+model Expense {
+  id            String        @id @default(cuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vendorId      String?
+  vendor        Vendor?       @relation(fields: [vendorId], references: [id])
+  date          DateTime      @default(now())
+  amount        Decimal       @db.Decimal(10, 2)
+  category      String?
+  description   String?
+  receipt       String?       // URL to receipt file (Uploadthing)
+  paymentMethod PaymentMethod @default(CASH)
+  status        ExpenseStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([organizationId])
+  @@index([vendorId])
+  @@index([date])
+  @@index([category])
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REIMBURSED
+  PAID
+}
+
+// Chart of Accounts - Ledger Account
+model LedgerAccount {
+  id            String          @id @default(cuid())
+  organizationId String
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  code          String          // Account code (e.g., 1000, 2000)
+  name          String
+  type          AccountType
+  parentId      String?
+  parent        LedgerAccount?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children      LedgerAccount[] @relation("AccountHierarchy")
+  isSystem      Boolean         @default(false) // System accounts cannot be deleted
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  entries       LedgerEntry[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId])
+  @@index([type])
+  @@index([parentId])
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+// General Ledger Entry (Double-entry bookkeeping)
+model LedgerEntry {
+  id            String        @id @default(cuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       LedgerAccount @relation(fields: [accountId], references: [id])
+  date          DateTime      @default(now())
+  debit         Decimal       @default(0) @db.Decimal(10, 2)
+  credit        Decimal       @default(0) @db.Decimal(10, 2)
+  description   String
+  reference     String?       // Reference type (e.g., "invoice", "payment")
+  referenceId   String?       // ID of the referenced record
+  createdAt     DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([date])
+  @@index([reference, referenceId])
+}
+
+// Bank Account model
+model BankAccount {
+  id            String        @id @default(cuid())
+  organizationId String
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name          String
+  type          BankAccountType
+  accountNumber String?
+  bankName      String?
+  balance       Decimal       @default(0) @db.Decimal(10, 2)
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  transactions  BankTransaction[]
+
+  @@index([organizationId])
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  OTHER
+}
+
+// Bank Transaction model
+model BankTransaction {
+  id            String            @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount       @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  date          DateTime          @default(now())
+  amount        Decimal           @db.Decimal(10, 2) // Positive for deposits, negative for withdrawals
+  description   String
+  type          TransactionType
+  reference     String?           // Check number, transaction ID, etc.
+  matched       Boolean           @default(false) // Matched with invoice/expense
+  matchedId     String?           // ID of matched record
+  reconciled    Boolean           @default(false) // Reconciliation status
+  reconciledAt  DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([bankAccountId])
+  @@index([date])
+  @@index([matched])
+  @@index([reconciled])
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  FEE
+  INTEREST
+}
+
+// Subscription model (Stripe integration)
+model Subscription {
+  id                    String            @id @default(cuid())
+  organizationId        String            @unique
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId  String            @unique
+  stripeCustomerId      String
+  status                SubscriptionStatus
+  plan                  SubscriptionPlan  @default(FREE)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([organizationId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  UNPAID
+  TRIALING
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// Settings model
+model Settings {
+  id              String       @id @default(cuid())
+  organizationId  String       @unique
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  taxSettings     Json?        // Tax rates, default tax, etc.
+  invoiceSettings Json?        // Invoice numbering, terms, templates
+  emailSettings   Json?        // SMTP settings, templates
+  fiscalYearStart String?      @default("01-01") // MM-DD format
+  currency        String?      @default("USD")
+  timezone        String?      @default("UTC")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([organizationId])
+}
