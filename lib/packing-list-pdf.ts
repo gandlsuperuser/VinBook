@@ -83,8 +83,12 @@ export async function downloadPackingListPDF(invoice: any) {
         </div>
         <div style="flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
           <div style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #6b7280; margin-bottom: 6px; letter-spacing: 0.5px;">Ship / Deliver To:</div>
-          <div style="font-size: 13px; line-height: 1.5; font-weight: 600; color: #111;">${invoice.customer?.name || "-"}</div>
-          ${shippingLines.length > 0 ? shippingLines.map((line) => `<div style="font-size: 12px; color: #4b5563;">${line}</div>`).join("") : billingLines.map((line) => `<div style="font-size: 12px; color: #4b5563;">${line}</div>`).join("")}
+          ${invoice.shipTo ? `
+            <div style="font-size: 12px; line-height: 1.5; color: #111; white-space: pre-wrap;">${invoice.shipTo}</div>
+          ` : `
+            <div style="font-size: 13px; line-height: 1.5; font-weight: 600; color: #111;">${invoice.customer?.name || "-"}</div>
+            ${shippingLines.length > 0 ? shippingLines.map((line) => `<div style="font-size: 12px; color: #4b5563;">${line}</div>`).join("") : billingLines.map((line) => `<div style="font-size: 12px; color: #4b5563;">${line}</div>`).join("")}
+          `}
         </div>
       </div>
 

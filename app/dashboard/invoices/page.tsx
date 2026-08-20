@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil, Package, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Package, Loader2, GripVertical, RotateCcw } from "lucide-react";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { InvoiceStatus } from "@prisma/client";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
@@ -57,6 +57,24 @@ interface InvoiceSummary {
   overdueCount: number;
   overdueAmount: number;
 }
+
+export type ColumnId = "date" | "number" | "customer" | "sideMark" | "status" | "amount" | "actions";
+
+interface ColumnConfig {
+  id: ColumnId;
+  label: string;
+  align?: "left" | "right";
+}
+
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+  { id: "date", label: "Date", align: "left" },
+  { id: "number", label: "Invoice #", align: "left" },
+  { id: "customer", label: "Customer", align: "left" },
+  { id: "sideMark", label: "Side Mark", align: "left" },
+  { id: "status", label: "Status", align: "left" },
+  { id: "amount", label: "Amount", align: "right" },
+  { id: "actions", label: "Actions", align: "right" },
+];
 
 function getDateRangeForPreset(
   preset: string,
@@ -175,6 +193,64 @@ export default function InvoicesPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [generatingPackingListId, setGeneratingPackingListId] = useState<string | null>(null);
 
+  // Dynamic movable columns state
+  const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  const [draggedColIndex, setDraggedColIndex] = useState<number | null>(null);
+  const [dragOverColIndex, setDragOverColIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("vinbook_invoices_column_order");
+      if (saved) {
+        const orderIds: string[] = JSON.parse(saved);
+        const reordered: ColumnConfig[] = [];
+        orderIds.forEach((id) => {
+          const col = DEFAULT_COLUMNS.find((c) => c.id === id);
+          if (col) reordered.push(col);
+        });
+        DEFAULT_COLUMNS.forEach((col) => {
+          if (!reordered.some((c) => c.id === col.id)) {
+            reordered.push(col);
+          }
+        });
+        if (reordered.length === DEFAULT_COLUMNS.length) {
+          setColumns(reordered);
+        }
+      }
+    } catch {
+      // fallback to DEFAULT_COLUMNS
+    }
+  }, []);
+
+  const handleColumnDrop = (targetIndex: number) => {
+    if (draggedColIndex === null || draggedColIndex === targetIndex) {
+      setDraggedColIndex(null);
+      setDragOverColIndex(null);
+      return;
+    }
+    const newCols = [...columns];
+    const [dragged] = newCols.splice(draggedColIndex, 1);
+    newCols.splice(targetIndex, 0, dragged);
+    setColumns(newCols);
+    try {
+      localStorage.setItem(
+        "vinbook_invoices_column_order",
+        JSON.stringify(newCols.map((c) => c.id))
+      );
+    } catch {}
+    setDraggedColIndex(null);
+    setDragOverColIndex(null);
+  };
+
+  const handleResetColumns = () => {
+    setColumns(DEFAULT_COLUMNS);
+    try {
+      localStorage.removeItem("vinbook_invoices_column_order");
+    } catch {}
+  };
+
+  const isCustomColumnOrder = JSON.stringify(columns.map((c) => c.id)) !== JSON.stringify(DEFAULT_COLUMNS.map((c) => c.id));
+
   const handleDownloadPackingList = async (invoiceId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -290,6 +366,129 @@ export default function InvoicesPage() {
     }
   };
 
+  const renderCellContent = (columnId: ColumnId, invoice: Invoice) => {
+    const paidAmount = invoice.payments.reduce(
+      (sum, p) => sum + Number(p.amount),
+      0
+    );
+
+    switch (columnId) {
+      case "date":
+        return (
+          <span className="font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
+            {new Date(invoice.date).toLocaleDateString()}
+          </span>
+        );
+
+      case "number":
+        return (
+          <div>
+            <Link
+              href={`/dashboard/invoices/${invoice.id}`}
+              className="font-semibold text-primary hover:underline hover:text-blue-600 transition-colors inline-block"
+            >
+              {invoice.number}
+            </Link>
+            {invoice.poNumber && (
+              <div className="text-xs text-muted-foreground font-mono">
+                PO: {invoice.poNumber}
+              </div>
+            )}
+          </div>
+        );
+
+      case "customer":
+        return (
+          <div>
+            <div className="font-medium text-zinc-900 dark:text-zinc-100">{invoice.customer.name}</div>
+            {invoice.salesRep && (
+              <div className="text-xs text-muted-foreground">
+                Rep: {invoice.salesRep}
+              </div>
+            )}
+          </div>
+        );
+
+      case "sideMark":
+        return invoice.sideMark ? (
+          <div
+            className="text-xs font-mono text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded px-2 py-1 max-w-[220px] truncate"
+            title={invoice.sideMark}
+          >
+            {invoice.sideMark}
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-xs">-</span>
+        );
+
+      case "status":
+        return (
+          <span
+            className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(
+              invoice.status
+            )}`}
+          >
+            {invoice.status}
+          </span>
+        );
+
+      case "amount":
+        return (
+          <div>
+            <div className="font-semibold text-zinc-900 dark:text-zinc-50">
+              ${Number(invoice.total).toLocaleString()}
+            </div>
+            {paidAmount > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Paid: ${paidAmount.toLocaleString()}
+              </div>
+            )}
+          </div>
+        );
+
+      case "actions":
+        return (
+          <div className="flex gap-1 justify-end">
+            <Button variant="ghost" size="icon" asChild title="View Invoice">
+              <Link href={`/dashboard/invoices/${invoice.id}`}>
+                <Eye className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => handleDownloadPackingList(invoice.id, e)}
+              disabled={generatingPackingListId === invoice.id}
+              className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+              title="Generate / Download Packing List"
+            >
+              {generatingPackingListId === invoice.id ? (
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+              ) : (
+                <Package className="h-4 w-4" />
+              )}
+            </Button>
+            {invoice.status !== InvoiceStatus.PAID && (
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Edit Invoice"
+                onClick={() => {
+                  setEditingInvoice(invoice);
+                  setIsDialogOpen(true);
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -363,250 +562,199 @@ export default function InvoicesPage() {
       </Dialog>
 
       {/* Filter Bar with Date Filter just like the reference photo */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search invoice #, PO, side mark, customer..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
-          />
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 flex-1">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search invoice #, PO, side mark, customer..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
 
-        {/* Date Filter Dropdown */}
-        <div className="flex items-center gap-1.5">
-          <Select value={dateFilter} onValueChange={(val) => {
-            setDateFilter(val);
+          {/* Date Filter Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <Select value={dateFilter} onValueChange={(val) => {
+              setDateFilter(val);
+              setPage(1);
+            }}>
+              <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900">
+                <SelectValue placeholder="Date" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="custom">Custom dates</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="yesterday">Yesterday</SelectItem>
+                <SelectItem value="this_week">This week</SelectItem>
+                <SelectItem value="last_week">Last week</SelectItem>
+                <SelectItem value="this_month">This month</SelectItem>
+                <SelectItem value="last_month">Last month</SelectItem>
+                <SelectItem value="last_30_days">Last 30 days</SelectItem>
+                <SelectItem value="this_quarter">This quarter</SelectItem>
+                <SelectItem value="last_quarter">Last quarter</SelectItem>
+                <SelectItem value="last_3_months">Last 3 months</SelectItem>
+                <SelectItem value="this_year">This year</SelectItem>
+                <SelectItem value="last_year">Last year</SelectItem>
+                <SelectItem value="last_12_months">Last 12 months</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Custom Date Inputs if Custom Dates selected */}
+          {dateFilter === "custom" && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
+                placeholder="Start date"
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
+                placeholder="End date"
+              />
+            </div>
+          )}
+
+          <Select value={statusFilter} onValueChange={(val) => {
+            setStatusFilter(val);
+            setPage(1);
+          }}>
+            <SelectTrigger className="w-[160px] bg-white dark:bg-zinc-900">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value={InvoiceStatus.DRAFT}>Draft</SelectItem>
+              <SelectItem value={InvoiceStatus.SENT}>Sent</SelectItem>
+              <SelectItem value={InvoiceStatus.PARTIAL}>Partial</SelectItem>
+              <SelectItem value={InvoiceStatus.PAID}>Paid</SelectItem>
+              <SelectItem value={InvoiceStatus.OVERDUE}>Overdue</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={customerFilter} onValueChange={(val) => {
+            setCustomerFilter(val);
             setPage(1);
           }}>
             <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900">
-              <SelectValue placeholder="Date" />
+              <SelectValue placeholder="All Customers" />
             </SelectTrigger>
-            <SelectContent className="max-h-[300px]">
-              <SelectItem value="all">All</SelectItem>
-              <SelectItem value="custom">Custom dates</SelectItem>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="this_week">This week</SelectItem>
-              <SelectItem value="last_week">Last week</SelectItem>
-              <SelectItem value="this_month">This month</SelectItem>
-              <SelectItem value="last_month">Last month</SelectItem>
-              <SelectItem value="last_30_days">Last 30 days</SelectItem>
-              <SelectItem value="this_quarter">This quarter</SelectItem>
-              <SelectItem value="last_quarter">Last quarter</SelectItem>
-              <SelectItem value="last_3_months">Last 3 months</SelectItem>
-              <SelectItem value="this_year">This year</SelectItem>
-              <SelectItem value="last_year">Last year</SelectItem>
-              <SelectItem value="last_12_months">Last 12 months</SelectItem>
+            <SelectContent>
+              <SelectItem value="all">All Customers</SelectItem>
+              {customers.map((customer) => (
+                <SelectItem key={customer.id} value={customer.id}>
+                  {customer.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Custom Date Inputs if Custom Dates selected */}
-        {dateFilter === "custom" && (
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={customStartDate}
-              onChange={(e) => setCustomStartDate(e.target.value)}
-              className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
-              placeholder="Start date"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input
-              type="date"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
-              placeholder="End date"
-            />
-          </div>
+        {/* Reset columns order button if moved */}
+        {isCustomColumnOrder && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleResetColumns}
+            className="text-xs gap-1 text-muted-foreground hover:text-foreground"
+            title="Reset column order to default"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset Columns
+          </Button>
         )}
-
-        <Select value={statusFilter} onValueChange={(val) => {
-          setStatusFilter(val);
-          setPage(1);
-        }}>
-          <SelectTrigger className="w-[160px] bg-white dark:bg-zinc-900">
-            <SelectValue placeholder="All Statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value={InvoiceStatus.DRAFT}>Draft</SelectItem>
-            <SelectItem value={InvoiceStatus.SENT}>Sent</SelectItem>
-            <SelectItem value={InvoiceStatus.PARTIAL}>Partial</SelectItem>
-            <SelectItem value={InvoiceStatus.PAID}>Paid</SelectItem>
-            <SelectItem value={InvoiceStatus.OVERDUE}>Overdue</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={customerFilter} onValueChange={(val) => {
-          setCustomerFilter(val);
-          setPage(1);
-        }}>
-          <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900">
-            <SelectValue placeholder="All Customers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Customers</SelectItem>
-            {customers.map((customer) => (
-              <SelectItem key={customer.id} value={customer.id}>
-                {customer.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Invoice #</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Side Mark</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              {columns.map((col, idx) => {
+                const isDragging = draggedColIndex === idx;
+                const isDragOver = dragOverColIndex === idx && draggedColIndex !== idx;
+
+                return (
+                  <TableHead
+                    key={col.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", col.id);
+                      setDraggedColIndex(idx);
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragOverColIndex !== idx) setDragOverColIndex(idx);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverColIndex === idx) setDragOverColIndex(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleColumnDrop(idx);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedColIndex(null);
+                      setDragOverColIndex(null);
+                    }}
+                    className={`group select-none cursor-grab active:cursor-grabbing transition-all py-3 ${
+                      col.align === "right" ? "text-right" : "text-left"
+                    } ${
+                      isDragging
+                        ? "opacity-30 bg-zinc-100 dark:bg-zinc-800"
+                        : isDragOver
+                        ? "border-l-4 border-l-primary bg-primary/10"
+                        : "hover:bg-zinc-100/70 dark:hover:bg-zinc-800/50"
+                    }`}
+                    title="Drag column header left or right to reorder"
+                  >
+                    <div
+                      className={`inline-flex items-center gap-1 font-semibold ${
+                        col.align === "right" ? "justify-end w-full" : "justify-start"
+                      }`}
+                    >
+                      <GripVertical className="h-3.5 w-3.5 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      <span>{col.label}</span>
+                    </div>
+                  </TableHead>
+                );
+              })}
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center">
+                <TableCell colSpan={columns.length} className="text-center py-8">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : invoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center">
+                <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
                   No invoices found
                 </TableCell>
               </TableRow>
             ) : (
               invoices.map((invoice) => {
-                const paidAmount = invoice.payments.reduce(
-                  (sum, p) => sum + Number(p.amount),
-                  0
-                );
-                const isOverdue =
-                  invoice.status !== InvoiceStatus.PAID &&
-                  new Date(invoice.dueDate) < new Date();
-
                 return (
                   <TableRow key={invoice.id}>
-                    <TableCell>
-                      <Link
-                        href={`/dashboard/invoices/${invoice.id}`}
-                        className="font-medium text-primary hover:underline hover:text-blue-600 transition-colors inline-block"
+                    {columns.map((col) => (
+                      <TableCell
+                        key={col.id}
+                        className={col.align === "right" ? "text-right" : "text-left"}
                       >
-                        {invoice.number}
-                      </Link>
-                      {invoice.poNumber && (
-                        <div className="text-xs text-muted-foreground font-mono">
-                          PO: {invoice.poNumber}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div>{invoice.customer.name}</div>
-                      {invoice.salesRep && (
-                        <div className="text-xs text-muted-foreground">
-                          Rep: {invoice.salesRep}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="max-w-[200px]">
-                      {invoice.sideMark ? (
-                        <div
-                          className="text-xs font-mono text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded px-2 py-1 truncate"
-                          title={invoice.sideMark}
-                        >
-                          {invoice.sideMark}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(invoice.date).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      {isOverdue ? (
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-red-600 dark:text-red-400">
-                            {new Date(invoice.dueDate).toLocaleDateString()}
-                          </span>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
-                            Overdue
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-zinc-700 dark:text-zinc-300">
-                          {new Date(invoice.dueDate).toLocaleDateString()}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${getStatusColor(
-                          invoice.status
-                        )}`}
-                      >
-                        {invoice.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div>
-                        <div className="font-medium">
-                          ${Number(invoice.total).toLocaleString()}
-                        </div>
-                        {paidAmount > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            Paid: ${paidAmount.toLocaleString()}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" asChild title="View Invoice">
-                          <Link href={`/dashboard/invoices/${invoice.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => handleDownloadPackingList(invoice.id, e)}
-                          disabled={generatingPackingListId === invoice.id}
-                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                          title="Generate / Download Packing List"
-                        >
-                          {generatingPackingListId === invoice.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
-                          ) : (
-                            <Package className="h-4 w-4" />
-                          )}
-                        </Button>
-                        {invoice.status !== InvoiceStatus.PAID && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            title="Edit Invoice"
-                            onClick={() => {
-                              setEditingInvoice(invoice);
-                              setIsDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+                        {renderCellContent(col.id, invoice)}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 );
               })

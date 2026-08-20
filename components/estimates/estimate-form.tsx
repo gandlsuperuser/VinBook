@@ -39,6 +39,7 @@ interface Estimate {
   poNumber?: string | null;
   sideMark?: string | null;
   salesRep?: string | null;
+  shipTo?: string | null;
   notes?: string | null;
   terms?: string | null;
 }
@@ -70,6 +71,7 @@ export function EstimateForm({
     poNumber: estimate?.poNumber || "",
     sideMark: estimate?.sideMark || "",
     salesRep: estimate?.salesRep || "",
+    shipTo: estimate?.shipTo || "",
     items: estimate?.items || [
       { description: "", quantity: 1, rate: 0, amount: 0 },
     ],
@@ -208,6 +210,7 @@ export function EstimateForm({
         poNumber: formData.poNumber || undefined,
         sideMark: formData.sideMark || undefined,
         salesRep: formData.salesRep || undefined,
+        shipTo: formData.shipTo || undefined,
         items: formData.items.map((item) => ({
           ...item,
           productId: item.productId === "custom" ? undefined : item.productId || undefined,
@@ -242,6 +245,32 @@ export function EstimateForm({
     }
   };
 
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = customers.find((c) => c.id === customerId);
+    let autoShipTo = formData.shipTo;
+
+    if (customer && !autoShipTo) {
+      const addr = customer.shippingAddress || customer.billingAddress;
+      if (addr) {
+        const parts = [
+          customer.name,
+          addr.street,
+          [addr.city, addr.state, addr.zip].filter(Boolean).join(", "),
+          addr.country,
+        ].filter(Boolean);
+        if (parts.length > 0) {
+          autoShipTo = parts.join("\n");
+        }
+      }
+    }
+
+    setFormData({
+      ...formData,
+      customerId,
+      shipTo: autoShipTo,
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Header Information */}
@@ -250,9 +279,7 @@ export function EstimateForm({
           <Label htmlFor="customerId">Customer *</Label>
           <Select
             value={formData.customerId}
-            onValueChange={(value) =>
-              setFormData({ ...formData, customerId: value })
-            }
+            onValueChange={handleCustomerSelect}
             required
           >
             <SelectTrigger>
@@ -331,6 +358,25 @@ export function EstimateForm({
             }
           />
         </div>
+      </div>
+
+      {/* Ship To / Delivery Location */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="shipTo">Ship To / Delivery Address</Label>
+          <span className="text-xs text-muted-foreground">
+            Appears on Estimate, Converted Invoice & Packing List
+          </span>
+        </div>
+        <Textarea
+          id="shipTo"
+          placeholder="Enter jobsite name, delivery street address, city, state, zip or receiving dock..."
+          value={formData.shipTo}
+          onChange={(e) =>
+            setFormData({ ...formData, shipTo: e.target.value })
+          }
+          rows={3}
+        />
       </div>
 
       {/* Line Items - Same as invoice form */}

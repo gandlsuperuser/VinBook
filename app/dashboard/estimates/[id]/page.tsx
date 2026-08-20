@@ -47,6 +47,7 @@ interface Estimate {
   poNumber: string | null;
   sideMark: string | null;
   salesRep: string | null;
+  shipTo: string | null;
   notes: string | null;
   terms: string | null;
   convertedToInvoice: boolean;
@@ -283,13 +284,21 @@ export default function EstimateDetailPage() {
           </div>
         </div>
 
-        <div class="bill-to">
-          <h2>Bill To:</h2>
-          <div class="info">
-            <div class="name">${estimate.customer.name}</div>
-            ${estimate.customer.email ? `<div>${estimate.customer.email}</div>` : ""}
-            ${addressLines.map((line) => `<div>${line}</div>`).join("")}
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+          <div style="flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+            <h2 style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #4b5563; margin-bottom: 6px;">Bill To:</h2>
+            <div style="font-size: 13px; line-height: 1.5;">
+              <div style="font-weight: 600; color: #111;">${estimate.customer.name}</div>
+              ${estimate.customer.email ? `<div style="color: #4b5563;">${estimate.customer.email}</div>` : ""}
+              ${addressLines.map((line) => `<div style="color: #4b5563;">${line}</div>`).join("")}
+            </div>
           </div>
+          ${estimate.shipTo ? `
+            <div style="flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+              <h2 style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #4b5563; margin-bottom: 6px;">Ship / Deliver To:</h2>
+              <div style="font-size: 13px; line-height: 1.5; color: #111; white-space: pre-wrap;">${estimate.shipTo}</div>
+            </div>
+          ` : ""}
         </div>
 
         <table>
@@ -388,6 +397,7 @@ export default function EstimateDetailPage() {
     poNumber: estimate.poNumber || undefined,
     sideMark: estimate.sideMark || undefined,
     salesRep: estimate.salesRep || undefined,
+    shipTo: estimate.shipTo || undefined,
     notes: estimate.notes || undefined,
     terms: estimate.terms || undefined,
   } : null;
@@ -651,6 +661,18 @@ export default function EstimateDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Ship To Information */}
+        {estimate.shipTo && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Ship / Deliver To</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap font-medium">{estimate.shipTo}</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Estimate Summary */}
         <Card>

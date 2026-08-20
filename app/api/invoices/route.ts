@@ -26,6 +26,7 @@ const invoiceSchema = z.object({
   poNumber: z.string().optional(),
   sideMark: z.string().optional(),
   salesRep: z.string().optional(),
+  shipTo: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
 });
@@ -217,6 +218,7 @@ export async function POST(request: Request) {
         poNumber: validatedData.poNumber || null,
         sideMark: validatedData.sideMark || null,
         salesRep: validatedData.salesRep || null,
+        shipTo: validatedData.shipTo || null,
         notes: validatedData.notes || null,
         terms: validatedData.terms || null,
         items: {

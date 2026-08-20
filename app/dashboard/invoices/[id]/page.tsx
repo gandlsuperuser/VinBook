@@ -59,6 +59,7 @@ interface Invoice {
   poNumber: string | null;
   sideMark: string | null;
   salesRep: string | null;
+  shipTo: string | null;
   notes: string | null;
   terms: string | null;
   organization: {
@@ -357,13 +358,21 @@ export default function InvoiceDetailPage() {
           </div>
         </div>
 
-        <div style="margin-bottom: 30px;">
-          <h2 style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">Bill To:</h2>
-          <div style="font-size: 14px; line-height: 1.6;">
-            <div style="font-weight: 600; margin-bottom: 5px;">${invoice.customer.name}</div>
-            ${invoice.customer.email ? `<div>${invoice.customer.email}</div>` : ""}
-            ${addressLines.map((line) => `<div>${line}</div>`).join("")}
+        <div style="display: flex; justify-content: space-between; gap: 20px; margin-bottom: 30px;">
+          <div style="flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+            <h2 style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #4b5563; margin-bottom: 6px;">Bill To:</h2>
+            <div style="font-size: 13px; line-height: 1.5;">
+              <div style="font-weight: 600; color: #111;">${invoice.customer.name}</div>
+              ${invoice.customer.email ? `<div style="color: #4b5563;">${invoice.customer.email}</div>` : ""}
+              ${addressLines.map((line) => `<div style="color: #4b5563;">${line}</div>`).join("")}
+            </div>
           </div>
+          ${invoice.shipTo ? `
+            <div style="flex: 1; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px;">
+              <h2 style="font-size: 13px; font-weight: bold; text-transform: uppercase; color: #4b5563; margin-bottom: 6px;">Ship / Deliver To:</h2>
+              <div style="font-size: 13px; line-height: 1.5; color: #111; white-space: pre-wrap;">${invoice.shipTo}</div>
+            </div>
+          ` : ""}
         </div>
 
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -536,6 +545,7 @@ export default function InvoiceDetailPage() {
     poNumber: invoice.poNumber || undefined,
     sideMark: invoice.sideMark || undefined,
     salesRep: invoice.salesRep || undefined,
+    shipTo: invoice.shipTo || undefined,
     notes: invoice.notes || undefined,
     terms: invoice.terms || undefined,
     // Calculate taxRate from existing tax and subtotal
@@ -715,6 +725,18 @@ export default function InvoiceDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Ship To Information */}
+        {invoice.shipTo && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Ship / Deliver To</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm whitespace-pre-wrap font-medium">{invoice.shipTo}</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Invoice Summary */}
         <Card>

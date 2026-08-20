@@ -39,6 +39,7 @@ interface Invoice {
   poNumber?: string | null;
   sideMark?: string | null;
   salesRep?: string | null;
+  shipTo?: string | null;
   notes?: string | null;
   terms?: string | null;
   taxRate?: number;
@@ -63,6 +64,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     poNumber: invoice?.poNumber || "",
     sideMark: invoice?.sideMark || "",
     salesRep: invoice?.salesRep || "",
+    shipTo: invoice?.shipTo || "",
     items: invoice?.items || [
       { description: "", quantity: 1, rate: 0, amount: 0 },
     ],
@@ -96,6 +98,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
         poNumber: invoice.poNumber || "",
         sideMark: invoice.sideMark || "",
         salesRep: invoice.salesRep || "",
+        shipTo: invoice.shipTo || "",
         items: invoice.items?.map(item => ({
           id: item.id,
           productId: item.productId,
@@ -234,6 +237,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
         poNumber: formData.poNumber || undefined,
         sideMark: formData.sideMark || undefined,
         salesRep: formData.salesRep || undefined,
+        shipTo: formData.shipTo || undefined,
         items: formData.items.map((item) => ({
           description: item.description,
           quantity: Number(item.quantity) || 0,
@@ -272,6 +276,32 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     }
   };
 
+  const handleCustomerSelect = (customerId: string) => {
+    const customer = customers.find((c) => c.id === customerId);
+    let autoShipTo = formData.shipTo;
+
+    if (customer && !autoShipTo) {
+      const addr = customer.shippingAddress || customer.billingAddress;
+      if (addr) {
+        const parts = [
+          customer.name,
+          addr.street,
+          [addr.city, addr.state, addr.zip].filter(Boolean).join(", "),
+          addr.country,
+        ].filter(Boolean);
+        if (parts.length > 0) {
+          autoShipTo = parts.join("\n");
+        }
+      }
+    }
+
+    setFormData({
+      ...formData,
+      customerId,
+      shipTo: autoShipTo,
+    });
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Header Information */}
@@ -280,9 +310,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           <Label htmlFor="customerId">Customer *</Label>
           <Select
             value={formData.customerId}
-            onValueChange={(value) =>
-              setFormData({ ...formData, customerId: value })
-            }
+            onValueChange={handleCustomerSelect}
             required
           >
             <SelectTrigger>
@@ -361,6 +389,25 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
             }
           />
         </div>
+      </div>
+
+      {/* Ship To / Jobsite Delivery Address */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="shipTo">Ship To / Jobsite Delivery Address</Label>
+          <span className="text-xs text-muted-foreground">
+            Appears on Invoice Detail, Printed Invoice & Packing List
+          </span>
+        </div>
+        <Textarea
+          id="shipTo"
+          placeholder="Enter jobsite name, delivery street address, city, state, zip or receiving dock..."
+          value={formData.shipTo}
+          onChange={(e) =>
+            setFormData({ ...formData, shipTo: e.target.value })
+          }
+          rows={3}
+        />
       </div>
 
       {/* Line Items */}

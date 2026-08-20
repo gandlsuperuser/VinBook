@@ -200,6 +200,7 @@ model Invoice {
   poNumber      String?
   sideMark      String?       @db.Text
   salesRep      String?
+  shipTo        String?       @db.Text
   notes         String?
   terms         String?
   createdAt     DateTime      @default(now())
@@ -293,6 +294,7 @@ model Estimate {
   poNumber          String?
   sideMark          String?         @db.Text
   salesRep          String?
+  shipTo            String?         @db.Text
   convertedToInvoice Boolean        @default(false)
   convertedInvoiceId String?
   notes             String?
