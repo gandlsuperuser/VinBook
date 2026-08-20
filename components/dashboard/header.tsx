@@ -20,20 +20,12 @@ import { Sidebar } from "./sidebar";
 export function Header() {
   const { data: session } = useSession();
 
-  const userInitials = session?.user?.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2) || "U";
+  const userName = session?.user?.name || "Vincent";
+  const userEmail = session?.user?.email || "vincent@123.com";
+  const userInitials = "V";
 
-  const handleLogOut = async () => {
-    try {
-      await signOut({ callbackUrl: "/login", redirect: true });
-    } catch (error) {
-      console.error("Sign out error:", error);
-      window.location.href = "/login";
-    }
+  const handleLogOut = () => {
+    window.location.href = "/dashboard";
   };
 
   return (
@@ -67,10 +59,10 @@ export function Header() {
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">
-                  {session?.user?.name || "User"}
+                  {userName}
                 </p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  {session?.user?.email}
+                  {userEmail}
                 </p>
               </div>
             </DropdownMenuLabel>
