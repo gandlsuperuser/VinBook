@@ -1,25 +1,10 @@
 import NextAuth from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
-// EmailProvider temporarily removed - requires nodemailer or Resend configuration
-// import EmailProvider from "next-auth/providers/email";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { prisma } from "@/db/prisma";
 import { compare, hash } from "bcryptjs";
 import { UserRole } from "@prisma/client";
-
-// Validate required environment variables (log warnings instead of throwing)
-if (!process.env.NEXTAUTH_SECRET) {
-  console.error("⚠️  NEXTAUTH_SECRET is not set. Authentication will not work.");
-  console.error("Please set NEXTAUTH_SECRET in your environment variables.");
-  console.error("Generate one with: openssl rand -base64 32");
-}
-
-if (!process.env.NEXTAUTH_URL && process.env.NODE_ENV === "production") {
-  console.warn("⚠️  NEXTAUTH_URL is not set. This may cause issues in production.");
-  console.warn("Please set NEXTAUTH_URL to your production URL (e.g., https://vinbook.vercel.app)");
-}
 
 // Build providers array conditionally
 const providers: any[] = [
@@ -84,16 +69,11 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   );
 }
 
-// Only use PrismaAdapter if we have a valid database connection
-let adapter: any = undefined;
-try {
-  adapter = PrismaAdapter(prisma) as any;
-} catch (error) {
-  console.warn("Failed to initialize PrismaAdapter:", error);
-}
+// NOTE: No PrismaAdapter — we use pure JWT strategy with Credentials provider.
+// The adapter was causing /api/auth/session to crash on Vercel cold starts because
+// it tried to query Supabase on every session check, even with JWT strategy.
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...(adapter && { adapter }),
   providers,
   session: {
     strategy: "jwt",
@@ -107,24 +87,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async jwt({ token, user, account }: any) {
-      // On initial sign-in, user object is available — persist data into the JWT
+      // On initial sign-in, the user object from authorize() is available
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.organizationId = user.organizationId;
       }
 
-      // Only do a DB lookup if the token is still missing critical fields
-      // (e.g., first OAuth login where organizationId wasn't set by authorize())
+      // Only query DB if organizationId is still missing (e.g., OAuth first login)
       if (token.email && !token.organizationId) {
         try {
           let dbUser = await prisma.user.findFirst({
             where: { email: { equals: token.email, mode: "insensitive" } },
-            include: { organization: true },
           });
 
-          // If user does not exist in DB yet (e.g. OAuth first-time login)
           if (!dbUser) {
+            // First-time OAuth user — create user + org
             let org = await prisma.organization.findFirst();
             if (!org) {
               const slug = (token.name || token.email.split("@")[0])
@@ -156,21 +134,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 role: "ADMIN",
                 organizationId: org.id,
               },
-              include: { organization: true },
             });
           } else if (!dbUser.organizationId) {
-            // Auto-assign organization if missing
             let org = await prisma.organization.findFirst();
             if (!org) {
-              const slug = "org-" + Date.now();
               org = await prisma.organization.create({
-                data: { name: "Default Organization", slug },
+                data: { name: "Default Organization", slug: "org-" + Date.now() },
               });
             }
             dbUser = await prisma.user.update({
               where: { id: dbUser.id },
               data: { organizationId: org.id },
-              include: { organization: true },
             });
           }
 
@@ -180,8 +154,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.organizationId = dbUser.organizationId;
           }
         } catch (error) {
-          console.error("Error fetching/creating user in JWT callback:", error);
-          // Don't break the session — return the token as-is with whatever we have
+          console.error("Error in JWT callback DB lookup:", error);
+          // Don't crash — return token as-is so session stays alive
         }
       }
 
@@ -213,5 +187,3 @@ export async function comparePassword(
 ): Promise<boolean> {
   return compare(password, hashedPassword);
 }
-
-
