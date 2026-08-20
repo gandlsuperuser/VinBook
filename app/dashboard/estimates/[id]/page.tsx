@@ -44,6 +44,9 @@ interface Estimate {
   tax: number;
   discount: number;
   total: number;
+  poNumber: string | null;
+  sideMark: string | null;
+  salesRep: string | null;
   notes: string | null;
   terms: string | null;
   convertedToInvoice: boolean;
@@ -271,8 +274,10 @@ export default function EstimateDetailPage() {
               </div>
             </div>
             <div class="header-right">
-              <div style="margin-bottom: 10px;"><strong>Quote #:</strong> ${estimate.number}</div>
-              <div><strong>Date:</strong> ${new Date(estimate.date).toLocaleDateString()}</div>
+              <div style="margin-bottom: 6px;"><strong>Quote #:</strong> ${estimate.number}</div>
+              ${estimate.poNumber ? `<div style="margin-bottom: 6px;"><strong>PO #:</strong> ${estimate.poNumber}</div>` : ""}
+              ${estimate.salesRep ? `<div style="margin-bottom: 6px;"><strong>Sales Rep:</strong> ${estimate.salesRep}</div>` : ""}
+              <div style="margin-bottom: 6px;"><strong>Date:</strong> ${new Date(estimate.date).toLocaleDateString()}</div>
               ${estimate.expiryDate ? `<div><strong>Expiry Date:</strong> ${new Date(estimate.expiryDate).toLocaleDateString()}</div>` : ""}
             </div>
           </div>
@@ -380,6 +385,9 @@ export default function EstimateDetailPage() {
     tax: Number(estimate.tax) || 0,
     discount: Number(estimate.discount) || 0,
     total: Number(estimate.total) || 0,
+    poNumber: estimate.poNumber || undefined,
+    sideMark: estimate.sideMark || undefined,
+    salesRep: estimate.salesRep || undefined,
     notes: estimate.notes || undefined,
     terms: estimate.terms || undefined,
   } : null;
@@ -670,6 +678,14 @@ export default function EstimateDetailPage() {
               </span>
             </div>
             <div className="flex justify-between">
+              <span className="text-muted-foreground">PO Number:</span>
+              <span className="font-medium">{estimate.poNumber || "-"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Sales Rep:</span>
+              <span className="font-medium">{estimate.salesRep || "-"}</span>
+            </div>
+            <div className="flex justify-between">
               <span className="text-muted-foreground">Date:</span>
               <span>{new Date(estimate.date).toLocaleDateString()}</span>
             </div>
@@ -748,6 +764,23 @@ export default function EstimateDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Side Mark (Internal Only) */}
+      {estimate.sideMark && (
+        <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-amber-900 dark:text-amber-300 flex items-center justify-between">
+              <span>Side Mark (Internal / Warehouse)</span>
+              <span className="text-xs font-normal text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">
+                Hidden from printout quote & PDF
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap font-mono text-amber-950 dark:text-amber-100">{estimate.sideMark}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notes and Terms */}
       {(estimate.notes || estimate.terms) && (

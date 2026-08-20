@@ -28,7 +28,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Package } from "lucide-react";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { InvoiceStatus } from "@prisma/client";
 
@@ -39,6 +39,9 @@ interface Invoice {
   dueDate: string;
   status: InvoiceStatus;
   total: number;
+  poNumber?: string | null;
+  sideMark?: string | null;
+  salesRep?: string | null;
   customer: {
     id: string;
     name: string;
@@ -272,10 +275,27 @@ export default function InvoicesPage() {
                 );
                 return (
                   <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">
-                      {invoice.number}
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/invoices/${invoice.id}`}
+                        className="font-medium text-primary hover:underline hover:text-blue-600 transition-colors inline-block"
+                      >
+                        {invoice.number}
+                      </Link>
+                      {invoice.poNumber && (
+                        <div className="text-xs text-muted-foreground font-mono">
+                          PO: {invoice.poNumber}
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell>{invoice.customer.name}</TableCell>
+                    <TableCell>
+                      <div>{invoice.customer.name}</div>
+                      {invoice.salesRep && (
+                        <div className="text-xs text-muted-foreground">
+                          Rep: {invoice.salesRep}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {new Date(invoice.date).toLocaleDateString()}
                     </TableCell>
@@ -305,15 +325,27 @@ export default function InvoicesPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-1 justify-end">
-                        <Button variant="ghost" size="icon" asChild>
+                        <Button variant="ghost" size="icon" asChild title="View Invoice">
                           <Link href={`/dashboard/invoices/${invoice.id}`}>
                             <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                          title="Generate Packing List"
+                        >
+                          <Link href={`/dashboard/invoices/${invoice.id}`}>
+                            <Package className="h-4 w-4" />
                           </Link>
                         </Button>
                         {invoice.status !== InvoiceStatus.PAID && (
                           <Button
                             variant="ghost"
                             size="icon"
+                            title="Edit Invoice"
                             onClick={() => {
                               setEditingInvoice(invoice);
                               setIsDialogOpen(true);

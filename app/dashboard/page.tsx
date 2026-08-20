@@ -1,5 +1,6 @@
 import { requireAuth } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/db/prisma";
 import { format, subMonths, startOfMonth, endOfMonth, isAfter, isBefore, addDays } from "date-fns";
 import {
@@ -296,7 +297,13 @@ export default async function DashboardPage() {
                           {payment.invoice.customer.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {payment.invoice.number} · {format(new Date(payment.date), "MMM d, yyyy")}
+                          <Link
+                            href={`/dashboard/invoices/${payment.invoice.id}`}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {payment.invoice.number}
+                          </Link>
+                          {" · "}{format(new Date(payment.date), "MMM d, yyyy")}
                         </p>
                       </div>
                     </div>
@@ -329,7 +336,14 @@ export default async function DashboardPage() {
                 {sentInvoices.map((invoice) => (
                   <div key={invoice.id} className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium">{invoice.number}</p>
+                      <p className="text-sm font-medium">
+                        <Link
+                          href={`/dashboard/invoices/${invoice.id}`}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          {invoice.number}
+                        </Link>
+                      </p>
                       <p className="text-xs text-muted-foreground">
                         {invoice.customer.name} · Due {format(new Date(invoice.dueDate), "MMM d, yyyy")}
                       </p>

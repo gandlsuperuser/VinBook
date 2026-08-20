@@ -36,8 +36,11 @@ interface Invoice {
   tax?: number;
   discount?: number;
   total?: number;
-  notes?: string;
-  terms?: string;
+  poNumber?: string | null;
+  sideMark?: string | null;
+  salesRep?: string | null;
+  notes?: string | null;
+  terms?: string | null;
   taxRate?: number;
 }
 
@@ -57,6 +60,9 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     date: invoice?.date || new Date().toISOString().split("T")[0],
     dueDate: invoice?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
     status: invoice?.status || InvoiceStatus.DRAFT,
+    poNumber: invoice?.poNumber || "",
+    sideMark: invoice?.sideMark || "",
+    salesRep: invoice?.salesRep || "",
     items: invoice?.items || [
       { description: "", quantity: 1, rate: 0, amount: 0 },
     ],
@@ -87,6 +93,9 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
         date: formatDate(invoice.date),
         dueDate: formatDate(invoice.dueDate),
         status: invoice.status || InvoiceStatus.DRAFT,
+        poNumber: invoice.poNumber || "",
+        sideMark: invoice.sideMark || "",
+        salesRep: invoice.salesRep || "",
         items: invoice.items?.map(item => ({
           id: item.id,
           productId: item.productId,
@@ -222,6 +231,9 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
         date: formData.date,
         dueDate: formData.dueDate,
         status: formData.status,
+        poNumber: formData.poNumber || undefined,
+        sideMark: formData.sideMark || undefined,
+        salesRep: formData.salesRep || undefined,
         items: formData.items.map((item) => ({
           description: item.description,
           quantity: Number(item.quantity) || 0,
@@ -325,6 +337,28 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
               setFormData({ ...formData, dueDate: e.target.value })
             }
             required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="poNumber">PO Number</Label>
+          <Input
+            id="poNumber"
+            placeholder="e.g. PO-89412"
+            value={formData.poNumber}
+            onChange={(e) =>
+              setFormData({ ...formData, poNumber: e.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="salesRep">Sales Rep</Label>
+          <Input
+            id="salesRep"
+            placeholder="e.g. Li Mo"
+            value={formData.salesRep}
+            onChange={(e) =>
+              setFormData({ ...formData, salesRep: e.target.value })
+            }
           />
         </div>
       </div>
@@ -475,12 +509,35 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
         </div>
       </div>
 
+      {/* Side Mark (Internal Only) */}
+      <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sideMark" className="font-semibold text-amber-900 dark:text-amber-300">
+            Side Mark (Internal / Warehouse)
+          </Label>
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            Internal Note &bull; Will not show on printout invoice
+          </span>
+        </div>
+        <Textarea
+          id="sideMark"
+          placeholder="Enter side mark, warehouse instructions, bundle tags, jobsite notes..."
+          value={formData.sideMark}
+          onChange={(e) =>
+            setFormData({ ...formData, sideMark: e.target.value })
+          }
+          rows={3}
+          className="bg-white dark:bg-zinc-900"
+        />
+      </div>
+
       {/* Notes and Terms */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
+          <Label htmlFor="notes">Notes (Customer Visible)</Label>
           <Textarea
             id="notes"
+            placeholder="Notes shown on invoice..."
             value={formData.notes}
             onChange={(e) =>
               setFormData({ ...formData, notes: e.target.value })
@@ -492,6 +549,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           <Label htmlFor="terms">Terms & Conditions</Label>
           <Textarea
             id="terms"
+            placeholder="Payment terms, restocking policy..."
             value={formData.terms}
             onChange={(e) =>
               setFormData({ ...formData, terms: e.target.value })

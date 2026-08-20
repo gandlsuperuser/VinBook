@@ -36,6 +36,9 @@ interface Estimate {
   tax?: number;
   discount?: number;
   total?: number;
+  poNumber?: string | null;
+  sideMark?: string | null;
+  salesRep?: string | null;
   notes?: string | null;
   terms?: string | null;
 }
@@ -64,6 +67,9 @@ export function EstimateForm({
         .toISOString()
         .split("T")[0],
     status: estimate?.status || EstimateStatus.DRAFT,
+    poNumber: estimate?.poNumber || "",
+    sideMark: estimate?.sideMark || "",
+    salesRep: estimate?.salesRep || "",
     items: estimate?.items || [
       { description: "", quantity: 1, rate: 0, amount: 0 },
     ],
@@ -199,6 +205,9 @@ export function EstimateForm({
         date: formData.date,
         expiryDate: formData.expiryDate,
         status: formData.status,
+        poNumber: formData.poNumber || undefined,
+        sideMark: formData.sideMark || undefined,
+        salesRep: formData.salesRep || undefined,
         items: formData.items.map((item) => ({
           ...item,
           productId: item.productId === "custom" ? undefined : item.productId || undefined,
@@ -297,6 +306,28 @@ export function EstimateForm({
             value={formData.expiryDate}
             onChange={(e) =>
               setFormData({ ...formData, expiryDate: e.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="poNumber">PO Number</Label>
+          <Input
+            id="poNumber"
+            placeholder="e.g. PO-89412"
+            value={formData.poNumber}
+            onChange={(e) =>
+              setFormData({ ...formData, poNumber: e.target.value })
+            }
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="salesRep">Sales Rep</Label>
+          <Input
+            id="salesRep"
+            placeholder="e.g. Li Mo"
+            value={formData.salesRep}
+            onChange={(e) =>
+              setFormData({ ...formData, salesRep: e.target.value })
             }
           />
         </div>
@@ -446,6 +477,28 @@ export function EstimateForm({
             <span>${total.toFixed(2)}</span>
           </div>
         </div>
+      </div>
+
+      {/* Side Mark (Internal Only) */}
+      <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sideMark" className="font-semibold text-amber-900 dark:text-amber-300">
+            Side Mark (Internal / Warehouse)
+          </Label>
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            Internal Note &bull; Will not show on printout estimate or invoice
+          </span>
+        </div>
+        <Textarea
+          id="sideMark"
+          placeholder="Enter side mark, warehouse instructions, bundle tags, jobsite notes..."
+          value={formData.sideMark}
+          onChange={(e) =>
+            setFormData({ ...formData, sideMark: e.target.value })
+          }
+          rows={3}
+          className="bg-white dark:bg-zinc-900"
+        />
       </div>
 
       {/* Notes and Terms */}

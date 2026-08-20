@@ -23,6 +23,9 @@ const estimateSchema = z.object({
   tax: z.number().min(0),
   discount: z.number().min(0).optional(),
   total: z.number().min(0),
+  poNumber: z.string().optional(),
+  sideMark: z.string().optional(),
+  salesRep: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
 });
@@ -129,6 +132,9 @@ export async function PUT(
         tax: validatedData.tax,
         discount: validatedData.discount || 0,
         total: validatedData.total,
+        poNumber: validatedData.poNumber || null,
+        sideMark: validatedData.sideMark || null,
+        salesRep: validatedData.salesRep || null,
         notes: validatedData.notes || null,
         terms: validatedData.terms || null,
         items: {
@@ -206,17 +212,23 @@ export async function POST(
       );
     }
 
-    // Generate invoice number
-    const lastInvoice = await prisma.invoice.findFirst({
+    // Generate invoice number (starts at 99-1001, then 99-1002...)
+    const existingInvoices = await prisma.invoice.findMany({
       where: { organizationId: user.organizationId },
-      orderBy: { createdAt: "desc" },
+      select: { number: true },
     });
 
-    let invoiceNumber = "INV-001";
-    if (lastInvoice) {
-      const lastNumber = parseInt(lastInvoice.number.split("-")[1] || "0");
-      invoiceNumber = `INV-${String(lastNumber + 1).padStart(3, "0")}`;
+    let nextNumber = 1001;
+    for (const inv of existingInvoices) {
+      const match = inv.number.match(/^99-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num >= nextNumber) {
+          nextNumber = num + 1;
+        }
+      }
     }
+    const invoiceNumber = `99-${nextNumber}`;
 
     // Calculate due date (30 days from now or use estimate expiry date)
     const dueDate = estimate.expiryDate
@@ -236,6 +248,9 @@ export async function POST(
         tax: estimate.tax,
         discount: estimate.discount,
         total: estimate.total,
+        poNumber: estimate.poNumber,
+        sideMark: estimate.sideMark,
+        salesRep: estimate.salesRep,
         notes: estimate.notes,
         terms: estimate.terms,
         items: {

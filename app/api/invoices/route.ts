@@ -23,6 +23,9 @@ const invoiceSchema = z.object({
   tax: z.number().min(0),
   discount: z.number().min(0).optional(),
   total: z.number().min(0),
+  poNumber: z.string().optional(),
+  sideMark: z.string().optional(),
+  salesRep: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
 });
@@ -60,6 +63,8 @@ export async function GET(request: Request) {
     if (search) {
       where.OR = [
         { number: { contains: search, mode: "insensitive" as const } },
+        { poNumber: { contains: search, mode: "insensitive" as const } },
+        { salesRep: { contains: search, mode: "insensitive" as const } },
         { customer: { name: { contains: search, mode: "insensitive" as const } } },
       ];
     }
@@ -152,17 +157,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const validatedData = invoiceSchema.parse(body);
 
-    // Generate invoice number
-    const lastInvoice = await prisma.invoice.findFirst({
+    // Generate invoice number (starts at 99-1001, then 99-1002...)
+    const existingInvoices = await prisma.invoice.findMany({
       where: { organizationId: user.organizationId },
-      orderBy: { createdAt: "desc" },
+      select: { number: true },
     });
 
-    let invoiceNumber = "INV-001";
-    if (lastInvoice) {
-      const lastNumber = parseInt(lastInvoice.number.split("-")[1] || "0");
-      invoiceNumber = `INV-${String(lastNumber + 1).padStart(3, "0")}`;
+    let nextNumber = 1001;
+    for (const inv of existingInvoices) {
+      const match = inv.number.match(/^99-(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num >= nextNumber) {
+          nextNumber = num + 1;
+        }
+      }
     }
+    const invoiceNumber = `99-${nextNumber}`;
 
     // Create invoice with items
     const invoice = await prisma.invoice.create({
@@ -177,6 +188,9 @@ export async function POST(request: Request) {
         tax: validatedData.tax,
         discount: validatedData.discount || 0,
         total: validatedData.total,
+        poNumber: validatedData.poNumber || null,
+        sideMark: validatedData.sideMark || null,
+        salesRep: validatedData.salesRep || null,
         notes: validatedData.notes || null,
         terms: validatedData.terms || null,
         items: {

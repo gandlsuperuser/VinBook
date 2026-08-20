@@ -120,6 +120,53 @@ async function main() {
   console.log("✅ Created admin user:", adminUser.email);
   console.log("⚠️  WARNING: Change the admin password before production use!");
 
+  // Seed default inventory products
+  const { INVENTORY_CATALOG } = await import("../lib/inventory-data");
+  for (const item of INVENTORY_CATALOG) {
+    const existing = await prisma.product.findFirst({
+      where: {
+        organizationId: organization.id,
+        sku: item.sku,
+      },
+    });
+
+    if (existing) {
+      await prisma.product.update({
+        where: { id: existing.id },
+        data: {
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          type: item.type,
+          price: item.price,
+          cost: item.cost,
+          inventory: item.inventory,
+          unit: item.unit,
+          location: item.location,
+          isActive: true,
+        },
+      });
+    } else {
+      await prisma.product.create({
+        data: {
+          organizationId: organization.id,
+          sku: item.sku,
+          name: item.name,
+          description: item.description,
+          category: item.category,
+          type: item.type,
+          price: item.price,
+          cost: item.cost,
+          inventory: item.inventory,
+          unit: item.unit,
+          location: item.location,
+          isActive: true,
+        },
+      });
+    }
+  }
+  console.log(`✅ Seeded ${INVENTORY_CATALOG.length} inventory products`);
+
   console.log("🎉 Seeding completed successfully!");
 }
 

@@ -98,6 +98,26 @@ export async function POST(request: Request) {
       skipDuplicates: true,
     });
 
+    // Seed default inventory products for new organization
+    const { INVENTORY_CATALOG } = await import("@/lib/inventory-data");
+    await prisma.product.createMany({
+      data: INVENTORY_CATALOG.map((item) => ({
+        organizationId: organization.id,
+        sku: item.sku,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        type: item.type,
+        price: item.price,
+        cost: item.cost,
+        inventory: item.inventory,
+        unit: item.unit,
+        location: item.location,
+        isActive: true,
+      })),
+      skipDuplicates: true,
+    });
+
     // Create user
     const user = await prisma.user.create({
       data: {

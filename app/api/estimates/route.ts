@@ -23,6 +23,9 @@ const estimateSchema = z.object({
   tax: z.number().min(0),
   discount: z.number().min(0).optional(),
   total: z.number().min(0),
+  poNumber: z.string().optional(),
+  sideMark: z.string().optional(),
+  salesRep: z.string().optional(),
   notes: z.string().optional(),
   terms: z.string().optional(),
 });
@@ -147,6 +150,9 @@ export async function POST(request: Request) {
         tax: validatedData.tax,
         discount: validatedData.discount || 0,
         total: validatedData.total,
+        poNumber: validatedData.poNumber || null,
+        sideMark: validatedData.sideMark || null,
+        salesRep: validatedData.salesRep || null,
         notes: validatedData.notes || null,
         terms: validatedData.terms || null,
         items: {
