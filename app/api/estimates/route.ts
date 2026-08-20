@@ -39,21 +39,35 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    let organizationId = user.organizationId;
+    if (!organizationId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { organizationId: true },
+      });
+      organizationId = dbUser?.organizationId || "";
+    }
+
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const status = searchParams.get("status") as EstimateStatus | null;
     const customerId = searchParams.get("customerId") || "";
+    const startDate = searchParams.get("startDate") || "";
+    const endDate = searchParams.get("endDate") || "";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
     const where: any = {
-      organizationId: user.organizationId,
+      ...(organizationId ? { organizationId } : {}),
     };
 
     if (search) {
       where.OR = [
         { number: { contains: search, mode: "insensitive" as const } },
+        { poNumber: { contains: search, mode: "insensitive" as const } },
+        { sideMark: { contains: search, mode: "insensitive" as const } },
+        { salesRep: { contains: search, mode: "insensitive" as const } },
         { customer: { name: { contains: search, mode: "insensitive" as const } } },
       ];
     }
@@ -66,7 +80,17 @@ export async function GET(request: Request) {
       where.customerId = customerId;
     }
 
-    const [estimates, total] = await Promise.all([
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        where.date.gte = new Date(startDate.includes("T") ? startDate : `${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        where.date.lte = new Date(endDate.includes("T") ? endDate : `${endDate}T23:59:59.999Z`);
+      }
+    }
+
+    const [estimates, totalCount, aggregateData, acceptedData] = await Promise.all([
       prisma.estimate.findMany({
         where,
         skip,
@@ -93,15 +117,43 @@ export async function GET(request: Request) {
         },
       }),
       prisma.estimate.count({ where }),
+      prisma.estimate.aggregate({
+        where,
+        _sum: {
+          total: true,
+        },
+      }),
+      prisma.estimate.aggregate({
+        where: {
+          ...where,
+          status: EstimateStatus.ACCEPTED,
+        },
+        _count: {
+          id: true,
+        },
+        _sum: {
+          total: true,
+        },
+      }),
     ]);
+
+    const totalAmount = Number(aggregateData._sum.total || 0);
+    const acceptedCount = acceptedData._count.id;
+    const acceptedAmount = Number(acceptedData._sum.total || 0);
 
     return NextResponse.json({
       estimates,
+      summary: {
+        totalCount,
+        totalAmount,
+        acceptedCount,
+        acceptedAmount,
+      },
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {
