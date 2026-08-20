@@ -64,6 +64,7 @@ export async function GET(request: Request) {
       where.OR = [
         { number: { contains: search, mode: "insensitive" as const } },
         { poNumber: { contains: search, mode: "insensitive" as const } },
+        { sideMark: { contains: search, mode: "insensitive" as const } },
         { salesRep: { contains: search, mode: "insensitive" as const } },
         { customer: { name: { contains: search, mode: "insensitive" as const } } },
       ];
@@ -80,14 +81,14 @@ export async function GET(request: Request) {
     if (startDate || endDate) {
       where.date = {};
       if (startDate) {
-        where.date.gte = new Date(startDate);
+        where.date.gte = new Date(startDate.includes("T") ? startDate : `${startDate}T00:00:00.000Z`);
       }
       if (endDate) {
-        where.date.lte = new Date(endDate);
+        where.date.lte = new Date(endDate.includes("T") ? endDate : `${endDate}T23:59:59.999Z`);
       }
     }
 
-    const [invoices, total] = await Promise.all([
+    const [invoices, totalCount, aggregateData, overdueData] = await Promise.all([
       prisma.invoice.findMany({
         where,
         skip,
@@ -115,17 +116,42 @@ export async function GET(request: Request) {
         },
       }),
       prisma.invoice.count({ where }),
+      prisma.invoice.aggregate({
+        where,
+        _sum: {
+          total: true,
+        },
+      }),
+      prisma.invoice.aggregate({
+        where: {
+          ...where,
+          status: { not: InvoiceStatus.PAID },
+          dueDate: { lt: new Date() },
+        },
+        _sum: {
+          total: true,
+        },
+        _count: {
+          id: true,
+        },
+      }),
     ]);
 
-    console.log(`Found ${total} invoices for organizationId: ${user.organizationId}, returning ${invoices.length} on page ${page}`);
+    console.log(`Found ${totalCount} invoices for organizationId: ${user.organizationId}, returning ${invoices.length} on page ${page}`);
 
     return NextResponse.json({
       invoices,
+      summary: {
+        totalCount,
+        totalAmount: Number(aggregateData._sum.total || 0),
+        overdueCount: overdueData._count.id || 0,
+        overdueAmount: Number(overdueData._sum.total || 0),
+      },
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
       },
     });
   } catch (error) {

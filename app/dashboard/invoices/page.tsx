@@ -28,9 +28,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil, Package } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Package, Loader2 } from "lucide-react";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { InvoiceStatus } from "@prisma/client";
+import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
 
 interface Invoice {
   id: string;
@@ -50,11 +51,121 @@ interface Invoice {
   payments: Array<{ amount: number }>;
 }
 
+interface InvoiceSummary {
+  totalCount: number;
+  totalAmount: number;
+  overdueCount: number;
+  overdueAmount: number;
+}
+
+function getDateRangeForPreset(
+  preset: string,
+  customStart?: string,
+  customEnd?: string
+): { startDate?: string; endDate?: string } {
+  const now = new Date();
+  const formatYMD = (d: Date) => d.toISOString().split("T")[0];
+
+  switch (preset) {
+    case "today": {
+      const todayStr = formatYMD(now);
+      return { startDate: todayStr, endDate: todayStr };
+    }
+    case "yesterday": {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const str = formatYMD(yesterday);
+      return { startDate: str, endDate: str };
+    }
+    case "this_week": {
+      const startOfWeek = new Date(now);
+      const day = startOfWeek.getDay();
+      const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+      startOfWeek.setDate(diff);
+      return { startDate: formatYMD(startOfWeek), endDate: formatYMD(now) };
+    }
+    case "last_week": {
+      const startOfLastWeek = new Date(now);
+      const day = startOfLastWeek.getDay();
+      const diff = startOfLastWeek.getDate() - day - 6;
+      startOfLastWeek.setDate(diff);
+      const endOfLastWeek = new Date(startOfLastWeek);
+      endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
+      return { startDate: formatYMD(startOfLastWeek), endDate: formatYMD(endOfLastWeek) };
+    }
+    case "this_month": {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_month": {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_30_days": {
+      const start = new Date(now);
+      start.setDate(start.getDate() - 30);
+      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+    }
+    case "this_quarter": {
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), currentQuarter * 3, 1);
+      const end = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_quarter": {
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      const start = new Date(now.getFullYear(), (currentQuarter - 1) * 3, 1);
+      const end = new Date(now.getFullYear(), (currentQuarter - 1) * 3 + 3, 0);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_3_months": {
+      const start = new Date(now);
+      start.setMonth(start.getMonth() - 3);
+      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+    }
+    case "this_year": {
+      const start = new Date(now.getFullYear(), 0, 1);
+      const end = new Date(now.getFullYear(), 11, 31);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_year": {
+      const start = new Date(now.getFullYear() - 1, 0, 1);
+      const end = new Date(now.getFullYear() - 1, 11, 31);
+      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+    }
+    case "last_12_months": {
+      const start = new Date(now);
+      start.setMonth(start.getMonth() - 12);
+      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+    }
+    case "custom": {
+      return {
+        startDate: customStart || undefined,
+        endDate: customEnd || undefined,
+      };
+    }
+    case "all":
+    default:
+      return {};
+  }
+}
+
 export default function InvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [summary, setSummary] = useState<InvoiceSummary>({
+    totalCount: 0,
+    totalAmount: 0,
+    overdueCount: 0,
+    overdueAmount: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -62,14 +173,30 @@ export default function InvoicesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [generatingPackingListId, setGeneratingPackingListId] = useState<string | null>(null);
+
+  const handleDownloadPackingList = async (invoiceId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setGeneratingPackingListId(invoiceId);
+      const res = await fetch(`/api/invoices/${invoiceId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch invoice details");
+      }
+      const data = await res.json();
+      await downloadPackingListPDF(data.invoice || data);
+    } catch (error) {
+      console.error("Error generating packing list:", error);
+      alert(`Failed to generate packing list: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGeneratingPackingListId(null);
+    }
+  };
 
   useEffect(() => {
     fetchCustomers();
   }, []);
-
-  useEffect(() => {
-    console.log("Dialog state changed:", isDialogOpen);
-  }, [isDialogOpen]);
 
   const fetchCustomers = async () => {
     try {
@@ -92,7 +219,10 @@ export default function InvoicesPage() {
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (customerFilter !== "all") params.append("customerId", customerFilter);
 
-      console.log("Fetching invoices with params:", params.toString());
+      const dateRange = getDateRangeForPreset(dateFilter, customStartDate, customEndDate);
+      if (dateRange.startDate) params.append("startDate", dateRange.startDate);
+      if (dateRange.endDate) params.append("endDate", dateRange.endDate);
+
       const response = await fetch(`/api/invoices?${params.toString()}`);
       
       if (!response.ok) {
@@ -110,8 +240,10 @@ export default function InvoicesPage() {
       }
 
       const data = await response.json();
-      console.log("Invoices response:", data);
       setInvoices(data.invoices || []);
+      if (data.summary) {
+        setSummary(data.summary);
+      }
       setTotalPages(data.pagination?.totalPages || 1);
     } catch (error) {
       console.error("Error fetching invoices:", error);
@@ -123,7 +255,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     fetchInvoices();
-  }, [page, statusFilter, customerFilter]);
+  }, [page, statusFilter, customerFilter, dateFilter, customStartDate, customEndDate]);
 
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
@@ -132,7 +264,7 @@ export default function InvoicesPage() {
       } else {
         setPage(1);
       }
-    }, 500);
+    }, 400);
 
     return () => clearTimeout(debounceTimer);
   }, [search]);
@@ -146,31 +278,31 @@ export default function InvoicesPage() {
   const getStatusColor = (status: InvoiceStatus) => {
     switch (status) {
       case InvoiceStatus.PAID:
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300";
       case InvoiceStatus.SENT:
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300";
       case InvoiceStatus.OVERDUE:
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300";
       case InvoiceStatus.PARTIAL:
-        return "bg-yellow-100 text-yellow-800";
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/60 dark:text-yellow-300";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Invoices</h1>
           <p className="text-muted-foreground">
-            Manage your invoices and track payments
+            Manage your commercial invoices, delivery tracking, and payments
           </p>
         </div>
         <Button 
           type="button"
           onClick={() => {
-            console.log("Create Invoice button clicked");
             setEditingInvoice(null);
             setIsDialogOpen(true);
           }}
@@ -178,6 +310,33 @@ export default function InvoicesPage() {
           <Plus className="mr-2 h-4 w-4" />
           Create Invoice
         </Button>
+      </div>
+
+      {/* Summary Cards according to Date Filter */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="relative overflow-hidden rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-50/80 via-purple-50/40 to-white p-5 shadow-sm dark:border-indigo-900/50 dark:from-indigo-950/40 dark:via-purple-950/20 dark:to-zinc-900">
+          <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+            Total Invoiced Amount
+          </div>
+          <div className="mt-2 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+            ${summary.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="mt-1 text-xs font-medium text-indigo-600 dark:text-indigo-400">
+            {summary.totalCount} total invoice{summary.totalCount === 1 ? "" : "s"}
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-xl border border-red-200/80 bg-gradient-to-br from-red-50/80 via-orange-50/40 to-white p-5 shadow-sm dark:border-red-900/50 dark:from-red-950/40 dark:via-orange-950/20 dark:to-zinc-900">
+          <div className="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-300">
+            Overdue Invoices
+          </div>
+          <div className="mt-2 text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">
+            ${summary.overdueAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">
+            {summary.overdueCount} overdue invoice{summary.overdueCount === 1 ? "" : "s"}
+          </div>
+        </div>
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -203,18 +362,73 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Filter Bar with Date Filter just like the reference photo */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search invoices..."
+            placeholder="Search invoice #, PO, side mark, customer..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]">
+
+        {/* Date Filter Dropdown */}
+        <div className="flex items-center gap-1.5">
+          <Select value={dateFilter} onValueChange={(val) => {
+            setDateFilter(val);
+            setPage(1);
+          }}>
+            <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900">
+              <SelectValue placeholder="Date" />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="custom">Custom dates</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="yesterday">Yesterday</SelectItem>
+              <SelectItem value="this_week">This week</SelectItem>
+              <SelectItem value="last_week">Last week</SelectItem>
+              <SelectItem value="this_month">This month</SelectItem>
+              <SelectItem value="last_month">Last month</SelectItem>
+              <SelectItem value="last_30_days">Last 30 days</SelectItem>
+              <SelectItem value="this_quarter">This quarter</SelectItem>
+              <SelectItem value="last_quarter">Last quarter</SelectItem>
+              <SelectItem value="last_3_months">Last 3 months</SelectItem>
+              <SelectItem value="this_year">This year</SelectItem>
+              <SelectItem value="last_year">Last year</SelectItem>
+              <SelectItem value="last_12_months">Last 12 months</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Custom Date Inputs if Custom Dates selected */}
+        {dateFilter === "custom" && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
+              placeholder="Start date"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="w-[145px] bg-white dark:bg-zinc-900 text-xs"
+              placeholder="End date"
+            />
+          </div>
+        )}
+
+        <Select value={statusFilter} onValueChange={(val) => {
+          setStatusFilter(val);
+          setPage(1);
+        }}>
+          <SelectTrigger className="w-[160px] bg-white dark:bg-zinc-900">
             <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -226,8 +440,12 @@ export default function InvoicesPage() {
             <SelectItem value={InvoiceStatus.OVERDUE}>Overdue</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={customerFilter} onValueChange={setCustomerFilter}>
-          <SelectTrigger className="w-[180px]">
+
+        <Select value={customerFilter} onValueChange={(val) => {
+          setCustomerFilter(val);
+          setPage(1);
+        }}>
+          <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900">
             <SelectValue placeholder="All Customers" />
           </SelectTrigger>
           <SelectContent>
@@ -247,6 +465,7 @@ export default function InvoicesPage() {
             <TableRow>
               <TableHead>Invoice #</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Side Mark</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Due Date</TableHead>
               <TableHead>Status</TableHead>
@@ -257,13 +476,13 @@ export default function InvoicesPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : invoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   No invoices found
                 </TableCell>
               </TableRow>
@@ -273,6 +492,10 @@ export default function InvoicesPage() {
                   (sum, p) => sum + Number(p.amount),
                   0
                 );
+                const isOverdue =
+                  invoice.status !== InvoiceStatus.PAID &&
+                  new Date(invoice.dueDate) < new Date();
+
                 return (
                   <TableRow key={invoice.id}>
                     <TableCell>
@@ -296,11 +519,36 @@ export default function InvoicesPage() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell className="max-w-[200px]">
+                      {invoice.sideMark ? (
+                        <div
+                          className="text-xs font-mono text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded px-2 py-1 truncate"
+                          title={invoice.sideMark}
+                        >
+                          {invoice.sideMark}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {new Date(invoice.date).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      {new Date(invoice.dueDate).toLocaleDateString()}
+                      {isOverdue ? (
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-red-600 dark:text-red-400">
+                            {new Date(invoice.dueDate).toLocaleDateString()}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+                            Overdue
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-zinc-700 dark:text-zinc-300">
+                          {new Date(invoice.dueDate).toLocaleDateString()}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span
@@ -333,13 +581,16 @@ export default function InvoicesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          asChild
+                          onClick={(e) => handleDownloadPackingList(invoice.id, e)}
+                          disabled={generatingPackingListId === invoice.id}
                           className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                          title="Generate Packing List"
+                          title="Generate / Download Packing List"
                         >
-                          <Link href={`/dashboard/invoices/${invoice.id}`}>
+                          {generatingPackingListId === invoice.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                          ) : (
                             <Package className="h-4 w-4" />
-                          </Link>
+                          )}
                         </Button>
                         {invoice.status !== InvoiceStatus.PAID && (
                           <Button
