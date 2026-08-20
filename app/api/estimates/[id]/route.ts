@@ -83,20 +83,29 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized. Please log in again." }, { status: 401 });
     }
     const { id } = await params;
 
     const body = await request.json();
     const validatedData = estimateSchema.parse(body);
 
+    let organizationId = user.organizationId;
+    if (!organizationId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { organizationId: true },
+      });
+      organizationId = dbUser?.organizationId || "";
+    }
+
     // Check if estimate exists
     const existingEstimate = await prisma.estimate.findFirst({
       where: {
         id: id,
-        organizationId: user.organizationId,
+        ...(organizationId ? { organizationId } : {}),
       },
     });
 
@@ -110,7 +119,7 @@ export async function PUT(
     // Don't allow editing converted estimates
     if (existingEstimate.convertedToInvoice) {
       return NextResponse.json(
-        { error: "Cannot edit estimate that has been converted to invoice" },
+        { error: "Cannot edit estimate that has already been converted to an invoice" },
         { status: 400 }
       );
     }
@@ -164,14 +173,19 @@ export async function PUT(
     return NextResponse.json(estimate);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const issues = error.issues.map((issue) => {
+        const field = issue.path.join(" -> ") || "form";
+        return `[${field}]: ${issue.message}`;
+      });
       return NextResponse.json(
-        { error: error.issues[0].message },
+        { error: `Validation Error on ${issues.join(", ")}` },
         { status: 400 }
       );
     }
     console.error("Error updating estimate:", error);
+    const msg = (error as any)?.message || "Failed to update estimate";
     return NextResponse.json(
-      { error: "Failed to update estimate" },
+      { error: `Unable to update estimate: ${msg}` },
       { status: 500 }
     );
   }

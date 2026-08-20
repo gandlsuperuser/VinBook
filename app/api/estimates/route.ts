@@ -118,28 +118,63 @@ export async function POST(request: Request) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized. Please log in again." }, { status: 401 });
     }
 
     const body = await request.json();
     const validatedData = estimateSchema.parse(body);
 
-    // Generate estimate number
-    const lastEstimate = await prisma.estimate.findFirst({
-      where: { organizationId: user.organizationId },
-      orderBy: { createdAt: "desc" },
+    let organizationId = user.organizationId;
+    if (!organizationId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { organizationId: true },
+      });
+      organizationId = dbUser?.organizationId || "";
+    }
+
+    if (!organizationId) {
+      const firstOrg = await prisma.organization.findFirst();
+      organizationId = firstOrg?.id || "";
+    }
+
+    // Check customer
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: validatedData.customerId,
+        ...(organizationId ? { organizationId } : {}),
+      },
     });
 
-    let estimateNumber = "EST-001";
-    if (lastEstimate) {
-      const lastNumber = parseInt(lastEstimate.number.split("-")[1] || "0");
-      estimateNumber = `EST-${String(lastNumber + 1).padStart(3, "0")}`;
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Selected customer was not found. Please select a valid customer from the dropdown." },
+        { status: 400 }
+      );
     }
+
+    // Generate unique estimate number safely
+    const allEstimates = await prisma.estimate.findMany({
+      where: { organizationId },
+      select: { number: true },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    let maxNum = 0;
+    for (const est of allEstimates) {
+      const match = est.number.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > maxNum) maxNum = num;
+      }
+    }
+    const estimateNumber = `EST-${String(maxNum + 1).padStart(3, "0")}`;
 
     // Create estimate with items
     const estimate = await prisma.estimate.create({
       data: {
-        organizationId: user.organizationId,
+        organizationId,
         number: estimateNumber,
         customerId: validatedData.customerId,
         date: new Date(validatedData.date),
@@ -182,14 +217,19 @@ export async function POST(request: Request) {
     return NextResponse.json(estimate, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const issues = error.issues.map((issue) => {
+        const field = issue.path.join(" -> ") || "form";
+        return `[${field}]: ${issue.message}`;
+      });
       return NextResponse.json(
-        { error: error.issues[0].message },
+        { error: `Validation Error on ${issues.join(", ")}` },
         { status: 400 }
       );
     }
     console.error("Error creating estimate:", error);
+    const msg = (error as any)?.message || "Failed to create estimate";
     return NextResponse.json(
-      { error: "Failed to create estimate" },
+      { error: `Unable to save estimate: ${msg}` },
       { status: 500 }
     );
   }
