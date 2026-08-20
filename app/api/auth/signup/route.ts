@@ -1,95 +1,98 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
-import { hashPassword } from "@/lib/auth";
+import { hash } from "bcryptjs";
+import { createSessionToken, setSessionCookie } from "@/lib/jwt";
 import { z } from "zod";
 
 const signupSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
-  organizationName: z.string().min(1, "Organization name is required"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email format"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  companyName: z.string().optional(),
 });
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const validatedData = signupSchema.parse(body);
+    const { name, email, password, companyName } = signupSchema.parse(body);
+
+    const cleanEmail = email.trim().toLowerCase();
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email: validatedData.email },
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: cleanEmail, mode: "insensitive" } },
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "User with this email already exists" },
+        { error: "An account with this email already exists" },
         { status: 400 }
       );
     }
 
-    // Generate organization slug
-    const slug = validatedData.organizationName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+    const hashedPassword = await hash(password, 12);
 
-    // Check if organization slug already exists
-    const existingOrg = await prisma.organization.findUnique({
-      where: { slug },
-    });
+    // Create organization
+    const orgName = companyName?.trim() || `${name}'s Company`;
+    const slug =
+      orgName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "") + `-${Date.now()}`;
 
-    if (existingOrg) {
-      return NextResponse.json(
-        { error: "Organization with this name already exists" },
-        { status: 400 }
-      );
-    }
-
-    // Hash password
-    const hashedPassword = await hashPassword(validatedData.password);
-
-    // Create organization and user
     const organization = await prisma.organization.create({
       data: {
-        name: validatedData.organizationName,
+        name: orgName,
         slug,
       },
     });
 
-    await prisma.user.create({
-      data: {
-        name: validatedData.name,
-        email: validatedData.email,
-        password: hashedPassword,
-        organizationId: organization.id,
-        role: "ADMIN", // First user is admin
-      },
-    });
-
-    // Create default settings
+    // Create settings for organization
     await prisma.settings.create({
       data: {
         organizationId: organization.id,
-        taxSettings: {
-          defaultTaxRate: 0,
-          taxInclusive: false,
-        },
-        invoiceSettings: {
-          prefix: "INV",
-          numberFormat: "00000",
-          defaultTerms: "Net 30",
-        },
+        taxSettings: { defaultTaxRate: 0, taxInclusive: false },
+        invoiceSettings: { prefix: "INV", numberFormat: "00000", defaultTerms: "Net 30" },
         currency: "USD",
         timezone: "UTC",
         fiscalYearStart: "01-01",
       },
     });
 
-    return NextResponse.json(
-      { message: "Account created successfully" },
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        name: name.trim(),
+        email: cleanEmail,
+        password: hashedPassword,
+        role: "ADMIN",
+        organizationId: organization.id,
+      },
+    });
+
+    const payload = {
+      id: user.id,
+      email: user.email,
+      name: user.name || name,
+      role: user.role,
+      organizationId: organization.id,
+    };
+
+    const token = await createSessionToken(payload);
+
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: payload,
+        organization: organization.name,
+      },
       { status: 201 }
     );
-  } catch (error) {
+
+    setSessionCookie(response, token);
+
+    return response;
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: error.issues[0].message },
@@ -99,11 +102,8 @@ export async function POST(request: Request) {
 
     console.error("Signup error:", error);
     return NextResponse.json(
-      { error: "Something went wrong" },
+      { error: "Failed to create account. Please try again." },
       { status: 500 }
     );
   }
 }
-
-
-

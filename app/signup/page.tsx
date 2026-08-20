@@ -14,167 +14,204 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Lock, Mail, User, Building, AlertCircle, ArrowRight, Shield } from "lucide-react";
 
 export default function SignupPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    organizationName: "",
-  });
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       setIsLoading(false);
       return;
     }
 
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters");
-      setIsLoading(false);
-      return;
-    }
-
     try {
-      const response = await fetch("/api/auth/signup", {
+      const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          organizationName: formData.organizationName,
+          name,
+          email,
+          password,
+          companyName,
         }),
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        setError(data.error || "Something went wrong");
+      if (!res.ok || !data.success) {
+        setError(data.error || "Failed to create account");
         setIsLoading(false);
         return;
       }
 
-      // Redirect to login with success message
-      router.push("/login?registered=true");
-    } catch (error) {
-      setError("Something went wrong. Please try again.");
+      // Hard redirect to dashboard
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setError("Network error. Please try again.");
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>
-            Enter your information to create your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                type="text"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="name@example.com"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="organizationName">Organization Name</Label>
-              <Input
-                id="organizationName"
-                type="text"
-                placeholder="My Company"
-                value={formData.organizationName}
-                onChange={(e) =>
-                  setFormData({ ...formData, organizationName: e.target.value })
-                }
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                required
-                disabled={isLoading}
-                minLength={8}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-                required
-                disabled={isLoading}
-                minLength={8}
-              />
-            </div>
-            {error && (
-              <div className="text-sm text-destructive">{error}</div>
-            )}
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Create Account"}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center text-sm">
-            <Link
-              href="/login"
-              className="text-primary hover:underline"
-            >
-              Already have an account? Sign in
-            </Link>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background px-4 py-12">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 mb-2">
+            <Shield className="h-6 w-6" />
           </div>
-        </CardContent>
-      </Card>
+          <h1 className="text-3xl font-bold tracking-tight">Create your account</h1>
+          <p className="text-sm text-muted-foreground">
+            Get started with VinBook accounting for your business
+          </p>
+        </div>
+
+        <Card className="border-border/60 shadow-xl backdrop-blur-sm bg-card/95">
+          <CardHeader className="space-y-1 pb-4">
+            <CardTitle className="text-xl font-semibold">Sign Up</CardTitle>
+            <CardDescription>
+              Create your organization and admin profile
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive border border-destructive/20">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSignup} className="space-y-3.5">
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Vincent Zhang"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="companyName">Company / Organization Name</Label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="companyName"
+                    type="text"
+                    placeholder="123 Floorings LLC"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    disabled={isLoading}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="At least 6 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    disabled={isLoading}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="Repeat password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    disabled={isLoading}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full font-medium h-10 shadow-md shadow-primary/20 mt-2"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                    <span>Creating account...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center gap-2">
+                    <span>Create Account</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </div>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+
+          <CardFooter className="pt-0 justify-center">
+            <p className="text-xs text-muted-foreground">
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary font-medium hover:underline">
+                Sign in
+              </Link>
+            </p>
+          </CardFooter>
+        </Card>
+      </div>
     </div>
   );
 }
-
-
-
