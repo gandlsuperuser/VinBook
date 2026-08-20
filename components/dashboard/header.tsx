@@ -27,6 +27,15 @@ export function Header() {
     .toUpperCase()
     .slice(0, 2) || "U";
 
+  const handleLogOut = async () => {
+    try {
+      await signOut({ callbackUrl: "/login", redirect: true });
+    } catch (error) {
+      console.error("Sign out error:", error);
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6">
       <Sheet>
@@ -74,8 +83,8 @@ export function Header() {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className="text-destructive"
+              onClick={handleLogOut}
+              className="text-destructive cursor-pointer"
             >
               Log out
             </DropdownMenuItem>

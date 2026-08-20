@@ -12,32 +12,33 @@ export async function proxy(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  const isAuthPage =
+  // Explicitly public / auth routes that should always be directly accessible
+  const isPublicPage =
+    pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
-    pathname.startsWith("/forgot-password");
-  const isApiAuth = pathname.startsWith("/api/auth");
-  const isPublicPage = pathname === "/" || pathname.startsWith("/public");
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/reset-password") ||
+    pathname.startsWith("/verify-email") ||
+    pathname.startsWith("/unauthorized") ||
+    pathname.startsWith("/public") ||
+    pathname.startsWith("/api/auth");
 
-  // Allow API auth routes and public pages
-  if (isApiAuth || isPublicPage) {
+  if (isPublicPage) {
     return NextResponse.next();
   }
 
-  // Check for session token cookie (Auth.js v5 uses these cookie names)
-  const hasSessionToken =
-    req.cookies.has("__Secure-authjs.session-token") ||
-    req.cookies.has("authjs.session-token") ||
-    req.cookies.has("__Secure-next-auth.session-token") ||
-    req.cookies.has("next-auth.session-token");
+  // Check for non-empty session token cookie
+  const sessionCookie =
+    req.cookies.get("__Secure-authjs.session-token") ||
+    req.cookies.get("authjs.session-token") ||
+    req.cookies.get("__Secure-next-auth.session-token") ||
+    req.cookies.get("next-auth.session-token");
 
-  // If user is authenticated and tries to access auth pages, redirect to dashboard
-  if (hasSessionToken && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
+  const hasValidToken = Boolean(sessionCookie?.value && sessionCookie.value.trim().length > 10);
 
-  // Protected routes that require authentication
-  if (!hasSessionToken && !isAuthPage) {
+  // Protected routes (dashboard, profile, etc.) that require authentication
+  if (!hasValidToken) {
     const loginUrl = new URL("/login", req.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
