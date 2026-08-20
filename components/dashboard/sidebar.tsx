@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/components/providers/language-context";
 import {
   LayoutDashboard,
   Users,
@@ -18,24 +19,25 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Customers", href: "/dashboard/customers", icon: Users },
-  { name: "Vendors", href: "/dashboard/vendors", icon: Building2 },
-  { name: "Products & Inventory", href: "/dashboard/products", icon: Package },
-  { name: "Invoices", href: "/dashboard/invoices", icon: FileText },
-  { name: "Estimates", href: "/dashboard/estimates", icon: Receipt },
-  { name: "Payments", href: "/dashboard/payments", icon: CreditCard },
-  { name: "Expenses", href: "/dashboard/expenses", icon: Banknote },
-  { name: "Chart of Accounts", href: "/dashboard/accounts", icon: BookOpen },
-  { name: "General Ledger", href: "/dashboard/ledger", icon: BookOpen },
-  { name: "Banking", href: "/dashboard/banking", icon: Banknote },
-  { name: "Reports", href: "/dashboard/reports", icon: BarChart3 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
-
 export function Sidebar() {
   const pathname = usePathname();
+  const { t } = useLanguage();
+
+  const navigation = [
+    { key: "dashboard", name: t("nav.dashboard"), href: "/dashboard", icon: LayoutDashboard },
+    { key: "customers", name: t("nav.customers"), href: "/dashboard/customers", icon: Users },
+    { key: "vendors", name: t("nav.vendors"), href: "/dashboard/vendors", icon: Building2 },
+    { key: "products", name: t("nav.products"), href: "/dashboard/products", icon: Package },
+    { key: "invoices", name: t("nav.invoices"), href: "/dashboard/invoices", icon: FileText },
+    { key: "estimates", name: t("nav.estimates"), href: "/dashboard/estimates", icon: Receipt },
+    { key: "payments", name: t("nav.payments"), href: "/dashboard/payments", icon: CreditCard },
+    { key: "expenses", name: t("nav.expenses"), href: "/dashboard/expenses", icon: Banknote },
+    { key: "accounts", name: t("nav.accounts"), href: "/dashboard/accounts", icon: BookOpen },
+    { key: "ledger", name: t("nav.ledger"), href: "/dashboard/ledger", icon: BookOpen },
+    { key: "banking", name: t("nav.banking"), href: "/dashboard/banking", icon: Banknote },
+    { key: "reports", name: t("nav.reports"), href: "/dashboard/reports", icon: BarChart3 },
+    { key: "settings", name: t("nav.settings"), href: "/dashboard/settings", icon: Settings },
+  ];
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-background">
@@ -50,7 +52,7 @@ export function Sidebar() {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           return (
             <Link
-              key={item.name}
+              key={item.key}
               href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-context";
+import { useLanguage } from "@/components/providers/language-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,15 +13,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Menu, LogOut, User, Settings } from "lucide-react";
+import { Menu, LogOut, User, Settings, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
+import { LanguageToggle } from "./language-toggle";
 
 export function Header() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
 
   const userName = user?.name || "Vincent";
-  const userEmail = user?.email || "vincent@123.com";
+  const userEmail = user?.email || "Vin@123floorings.com";
   const userRole = user?.role || "ADMIN";
 
   const userInitials =
@@ -29,30 +32,39 @@ export function Header() {
       .map((n) => n[0])
       .join("")
       .toUpperCase()
-      .slice(0, 2) || "U";
+      .slice(0, 2) || "V";
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-background px-4 sm:px-6">
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" className="lg:hidden">
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0">
-          <Sidebar />
-        </SheetContent>
-      </Sheet>
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-4 border-b bg-background/95 backdrop-blur px-4 sm:px-6">
+      <div className="flex items-center gap-3">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="lg:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-64 p-0">
+            <Sidebar />
+          </SheetContent>
+        </Sheet>
 
-      <div className="flex flex-1 items-center gap-4">
-        <h2 className="text-lg font-semibold">Dashboard</h2>
+        <div className="hidden sm:flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-0.5 rounded">
+            VinBook Enterprise
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Top Actions: Language Toggle & User Menu */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        {/* English / Spanish Toggle */}
+        <LanguageToggle />
+
+        {/* User Profile Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
+            <Button variant="ghost" className="relative h-9 w-9 rounded-full ring-2 ring-primary/20 hover:ring-primary/40 transition-all cursor-pointer">
               <Avatar className="h-9 w-9">
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
                   {userInitials}
@@ -78,13 +90,13 @@ export function Header() {
             <DropdownMenuItem asChild>
               <Link href="/profile" className="flex items-center gap-2 cursor-pointer">
                 <User className="h-4 w-4" />
-                <span>Profile</span>
+                <span>{t("nav.profile")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <Link href="/dashboard/settings" className="flex items-center gap-2 cursor-pointer">
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>{t("nav.settings")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -93,7 +105,7 @@ export function Header() {
               className="text-destructive flex items-center gap-2 cursor-pointer focus:text-destructive focus:bg-destructive/10"
             >
               <LogOut className="h-4 w-4" />
-              <span>Log out</span>
+              <span>{t("nav.logout")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
