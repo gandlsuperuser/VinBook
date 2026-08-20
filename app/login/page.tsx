@@ -54,12 +54,6 @@ function LoginForm() {
     }
   };
 
-  const fillDemoAccount = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError("");
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background px-4 py-12">
       <div className="w-full max-w-md space-y-6">
@@ -172,39 +166,6 @@ function LoginForm() {
                 )}
               </Button>
             </form>
-
-            {/* Quick Demo Credentials */}
-            <div className="pt-2">
-              <div className="relative my-3">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border/60" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground font-medium">
-                    Quick Demo Accounts
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount("vincent@123.com", "123123")}
-                  className="text-left rounded-lg border border-border/80 p-2.5 hover:bg-muted/50 transition-colors text-xs space-y-0.5 group"
-                >
-                  <p className="font-medium text-foreground group-hover:text-primary">vincent@123.com</p>
-                  <p className="text-muted-foreground">Pass: 123123 (Admin)</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fillDemoAccount("vincent@123floorings.com", "123123")}
-                  className="text-left rounded-lg border border-border/80 p-2.5 hover:bg-muted/50 transition-colors text-xs space-y-0.5 group"
-                >
-                  <p className="font-medium text-foreground group-hover:text-primary">vincent@123floorings.com</p>
-                  <p className="text-muted-foreground">Pass: 123123 (Admin)</p>
-                </button>
-              </div>
-            </div>
           </CardContent>
 
           <CardFooter className="pt-0 justify-center">
