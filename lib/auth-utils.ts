@@ -72,6 +72,17 @@ export async function getCurrentUser(request?: Request) {
       }
     }
 
+    if (!orgId) {
+      try {
+        const firstOrg = await prisma.organization.findFirst();
+        if (firstOrg) {
+          orgId = firstOrg.id;
+        }
+      } catch (e) {
+        console.warn("Could not find fallback organization:", e);
+      }
+    }
+
     return {
       id: (session.user.id || "user-id") as string,
       email: (session.user.email || "") as string,

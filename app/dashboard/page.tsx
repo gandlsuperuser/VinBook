@@ -70,11 +70,11 @@ function MetricCard({ title, value, change, changeType, icon, description }: Met
 export default async function DashboardPage() {
   const user = await requireAuth();
 
-  if (!user.organizationId) {
-    redirect("/login");
+  let orgId = user.organizationId;
+  if (!orgId) {
+    const firstOrg = await prisma.organization.findFirst();
+    orgId = firstOrg?.id || "";
   }
-
-  const orgId = user.organizationId;
   const now = new Date();
   const thirtyDaysFromNow = addDays(now, 30);
 
