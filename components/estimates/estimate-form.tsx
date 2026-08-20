@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { X, Plus, Trash2 } from "lucide-react";
 import { EstimateStatus } from "@prisma/client";
+import { useLanguage } from "@/components/providers/language-context";
 
 interface EstimateItem {
   id?: string;
@@ -55,6 +56,7 @@ export function EstimateForm({
   onSuccess,
   onCancel,
 }: EstimateFormProps) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customers, setCustomers] = useState<any[]>([]);
@@ -62,11 +64,7 @@ export function EstimateForm({
   const [formData, setFormData] = useState({
     customerId: estimate?.customerId || "",
     date: estimate?.date || new Date().toISOString().split("T")[0],
-    expiryDate:
-      estimate?.expiryDate ||
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
+    expiryDate: estimate?.expiryDate || "",
     status: estimate?.status || EstimateStatus.DRAFT,
     poNumber: estimate?.poNumber || "",
     sideMark: estimate?.sideMark || "",
@@ -182,7 +180,7 @@ export function EstimateForm({
     setError("");
 
     if (!formData.customerId) {
-      setError("Please select a customer");
+      setError(t("invoices.selectCustomer"));
       setLoading(false);
       return;
     }
@@ -205,7 +203,7 @@ export function EstimateForm({
       const payload = {
         customerId: formData.customerId,
         date: formData.date,
-        expiryDate: formData.expiryDate,
+        expiryDate: formData.expiryDate || undefined,
         status: formData.status,
         poNumber: formData.poNumber || undefined,
         sideMark: formData.sideMark || undefined,
@@ -217,7 +215,7 @@ export function EstimateForm({
           rate: Number(item.rate) || 0,
           amount: Number(item.amount) || 0,
           productId: item.productId === "custom" ? undefined : item.productId || undefined,
-          tax: item.tax !== undefined && item.tax !== null ? Number(item.tax) : undefined,
+          tax: item.tax ? Number(item.tax) : undefined,
         })),
         subtotal: Number(subtotal) || 0,
         tax: Number(tax) || 0,
@@ -236,7 +234,15 @@ export function EstimateForm({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Failed to save estimate");
+        let errMsg = data.error || "Failed to save estimate";
+        if (data.details && Array.isArray(data.details) && data.details.length > 0) {
+          const detailStrings = data.details.map((d: any) => {
+            const fieldPath = Array.isArray(d.path) ? d.path.join(".") : "";
+            return fieldPath ? `[${fieldPath}]: ${d.message}` : d.message;
+          });
+          errMsg = `${errMsg} (${detailStrings.join(", ")})`;
+        }
+        setError(errMsg);
         setLoading(false);
         return;
       }
@@ -253,19 +259,10 @@ export function EstimateForm({
     const customer = customers.find((c) => c.id === customerId);
     let autoShipTo = formData.shipTo;
 
-    if (customer && !autoShipTo) {
-      const addr = customer.shippingAddress || customer.billingAddress;
-      if (addr) {
-        const parts = [
-          customer.name,
-          addr.street,
-          [addr.city, addr.state, addr.zip].filter(Boolean).join(", "),
-          addr.country,
-        ].filter(Boolean);
-        if (parts.length > 0) {
-          autoShipTo = parts.join("\n");
-        }
-      }
+    if (!autoShipTo && customer?.shippingAddress) {
+      const s = customer.shippingAddress;
+      const lines = [s.street, [s.city, s.state, s.zip].filter(Boolean).join(", "), s.country].filter(Boolean);
+      if (lines.length > 0) autoShipTo = lines.join("\n");
     }
 
     setFormData({
@@ -280,14 +277,14 @@ export function EstimateForm({
       {/* Header Information */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="customerId">Customer *</Label>
+          <Label htmlFor="customerId">{t("common.customer")} *</Label>
           <Select
             value={formData.customerId}
             onValueChange={handleCustomerSelect}
             required
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select customer" />
+              <SelectValue placeholder={t("invoices.selectCustomer")} />
             </SelectTrigger>
             <SelectContent>
               {customers.map((customer) => (
@@ -299,7 +296,7 @@ export function EstimateForm({
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
+          <Label htmlFor="status">{t("common.status")}</Label>
           <Select
             value={formData.status}
             onValueChange={(value) =>
@@ -310,15 +307,15 @@ export function EstimateForm({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EstimateStatus.DRAFT}>Draft</SelectItem>
-              <SelectItem value={EstimateStatus.SENT}>Sent</SelectItem>
-              <SelectItem value={EstimateStatus.ACCEPTED}>Accepted</SelectItem>
-              <SelectItem value={EstimateStatus.REJECTED}>Rejected</SelectItem>
+              <SelectItem value={EstimateStatus.DRAFT}>{t("estimates.statusDraft")}</SelectItem>
+              <SelectItem value={EstimateStatus.SENT}>{t("estimates.statusSent")}</SelectItem>
+              <SelectItem value={EstimateStatus.ACCEPTED}>{t("estimates.statusAccepted")}</SelectItem>
+              <SelectItem value={EstimateStatus.REJECTED}>{t("estimates.statusRejected")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="date">Estimate Date *</Label>
+          <Label htmlFor="date">{t("estimates.estimateDate")} *</Label>
           <Input
             id="date"
             type="date"
@@ -330,7 +327,7 @@ export function EstimateForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="expiryDate">Expiry Date</Label>
+          <Label htmlFor="expiryDate">{t("estimates.expiryDate")}</Label>
           <Input
             id="expiryDate"
             type="date"
@@ -341,7 +338,7 @@ export function EstimateForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="poNumber">PO Number</Label>
+          <Label htmlFor="poNumber">{t("invoices.poNumber")}</Label>
           <Input
             id="poNumber"
             placeholder="e.g. PO-89412"
@@ -352,7 +349,7 @@ export function EstimateForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="salesRep">Sales Rep</Label>
+          <Label htmlFor="salesRep">{t("invoices.salesRep")}</Label>
           <Input
             id="salesRep"
             placeholder="e.g. Li Mo"
@@ -367,7 +364,7 @@ export function EstimateForm({
       {/* Ship To / Delivery Location */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="shipTo">Ship To / Delivery Address</Label>
+          <Label htmlFor="shipTo">{t("invoices.shipTo")}</Label>
           <span className="text-xs text-muted-foreground">
             Appears on Estimate, Converted Invoice & Packing List
           </span>
@@ -383,21 +380,21 @@ export function EstimateForm({
         />
       </div>
 
-      {/* Line Items - Same as invoice form */}
+      {/* Line Items */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Line Items</h3>
-          <Button type="button" variant="outline" size="sm" onClick={addItem}>
+          <h3 className="text-lg font-semibold">{t("invoices.itemDescription")}</h3>
+          <Button type="button" variant="outline" size="sm" onClick={addItem} className="cursor-pointer">
             <Plus className="mr-2 h-4 w-4" />
-            Add Item
+            {t("common.addItem")}
           </Button>
         </div>
         <div className="border rounded-lg">
           <div className="grid grid-cols-12 gap-2 p-2 bg-muted font-medium text-sm">
-            <div className="col-span-4">Product/Description</div>
-            <div className="col-span-2">Quantity</div>
-            <div className="col-span-2">Rate</div>
-            <div className="col-span-2">Amount</div>
+            <div className="col-span-4">{t("invoices.itemSku")} / {t("common.description")}</div>
+            <div className="col-span-2">{t("common.quantity")}</div>
+            <div className="col-span-2">{t("common.rate")}</div>
+            <div className="col-span-2">{t("common.amount")}</div>
             <div className="col-span-2"></div>
           </div>
           {formData.items.map((item, index) => (
@@ -410,10 +407,10 @@ export function EstimateForm({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
+                    <SelectValue placeholder={t("invoices.addCustomItem")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="custom">Custom</SelectItem>
+                    <SelectItem value="custom">{t("invoices.addCustomItem")}</SelectItem>
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name}
@@ -423,7 +420,7 @@ export function EstimateForm({
                 </Select>
                 <Input
                   className="mt-2"
-                  placeholder="Description"
+                  placeholder={t("common.description")}
                   value={item.description}
                   onChange={(e) =>
                     handleItemChange(index, "description", e.target.value)
@@ -455,16 +452,17 @@ export function EstimateForm({
                   required
                 />
               </div>
-              <div className="col-span-2 flex items-center">
+              <div className="col-span-2 flex items-center font-medium">
                 ${item.amount.toFixed(2)}
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 flex items-center justify-end">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => removeItem(index)}
                   disabled={formData.items.length === 1}
+                  className="cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -478,12 +476,12 @@ export function EstimateForm({
       <div className="flex justify-end">
         <div className="w-full max-w-md space-y-2">
           <div className="flex justify-between">
-            <span>Subtotal:</span>
+            <span>{t("common.subtotal")}:</span>
             <span>${subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
-              <Label htmlFor="taxRate">Tax Rate (%):</Label>
+              <Label htmlFor="taxRate">{t("invoices.taxRate")}:</Label>
               <Input
                 id="taxRate"
                 type="number"
@@ -504,7 +502,7 @@ export function EstimateForm({
           </div>
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
-              <Label htmlFor="discount">Discount:</Label>
+              <Label htmlFor="discount">{t("common.discount")}:</Label>
               <Input
                 id="discount"
                 type="number"
@@ -520,10 +518,10 @@ export function EstimateForm({
                 }
               />
             </div>
-            <span>-${formData.discount.toFixed(2)}</span>
+            <span>-${Number(formData.discount || 0).toFixed(2)}</span>
           </div>
           <div className="flex justify-between font-bold text-lg border-t pt-2">
-            <span>Total:</span>
+            <span>{t("common.total")}:</span>
             <span>${total.toFixed(2)}</span>
           </div>
         </div>
@@ -533,15 +531,15 @@ export function EstimateForm({
       <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
         <div className="flex items-center justify-between">
           <Label htmlFor="sideMark" className="font-semibold text-amber-900 dark:text-amber-300">
-            Side Mark (Internal / Warehouse)
+            {t("invoices.sideMarkLabel")}
           </Label>
           <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            Internal Note &bull; Will not show on printout estimate or invoice
+            {t("invoices.sideMarkHelp")}
           </span>
         </div>
         <Textarea
           id="sideMark"
-          placeholder="Enter side mark, warehouse instructions, bundle tags, jobsite notes..."
+          placeholder={t("invoices.sideMarkPlaceholder")}
           value={formData.sideMark}
           onChange={(e) =>
             setFormData({ ...formData, sideMark: e.target.value })
@@ -554,9 +552,10 @@ export function EstimateForm({
       {/* Notes and Terms */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes</Label>
+          <Label htmlFor="notes">{t("common.notes")}</Label>
           <Textarea
             id="notes"
+            placeholder={t("invoices.deliveryInstructions")}
             value={formData.notes}
             onChange={(e) =>
               setFormData({ ...formData, notes: e.target.value })
@@ -565,9 +564,10 @@ export function EstimateForm({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="terms">Terms & Conditions</Label>
+          <Label htmlFor="terms">{t("common.terms")}</Label>
           <Textarea
             id="terms"
+            placeholder={t("invoices.termsAndConditions")}
             value={formData.terms}
             onChange={(e) =>
               setFormData({ ...formData, terms: e.target.value })
@@ -580,15 +580,15 @@ export function EstimateForm({
       {error && <div className="text-sm text-destructive">{error}</div>}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+        <Button type="button" variant="outline" onClick={onCancel} className="cursor-pointer">
+          {t("common.cancel")}
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="cursor-pointer">
           {loading
-            ? "Saving..."
+            ? t("common.saving")
             : estimate?.id
-            ? "Update Estimate"
-            : "Create Estimate"}
+            ? t("estimates.editEstimate")
+            : t("estimates.newEstimate")}
         </Button>
       </div>
     </form>

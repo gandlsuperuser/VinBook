@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { X, Plus, Trash2 } from "lucide-react";
 import { InvoiceStatus } from "@prisma/client";
+import { useLanguage } from "@/components/providers/language-context";
 
 interface InvoiceItem {
   id?: string;
@@ -52,6 +53,7 @@ interface InvoiceFormProps {
 }
 
 export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customers, setCustomers] = useState<any[]>([]);
@@ -212,7 +214,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     setError("");
 
     if (!formData.customerId) {
-      setError("Please select a customer");
+      setError(t("invoices.selectCustomer"));
       setLoading(false);
       return;
     }
@@ -307,14 +309,14 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       {/* Header Information */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="customerId">Customer *</Label>
+          <Label htmlFor="customerId">{t("common.customer")} *</Label>
           <Select
             value={formData.customerId}
             onValueChange={handleCustomerSelect}
             required
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select customer" />
+              <SelectValue placeholder={t("invoices.selectCustomer")} />
             </SelectTrigger>
             <SelectContent>
               {customers.map((customer) => (
@@ -326,7 +328,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="status">Status</Label>
+          <Label htmlFor="status">{t("common.status")}</Label>
           <Select
             value={formData.status}
             onValueChange={(value) =>
@@ -337,14 +339,14 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={InvoiceStatus.DRAFT}>Draft</SelectItem>
-              <SelectItem value={InvoiceStatus.SENT}>Sent</SelectItem>
-              <SelectItem value={InvoiceStatus.PAID}>Paid</SelectItem>
+              <SelectItem value={InvoiceStatus.DRAFT}>{t("invoices.statusDraft")}</SelectItem>
+              <SelectItem value={InvoiceStatus.SENT}>{t("invoices.statusSent")}</SelectItem>
+              <SelectItem value={InvoiceStatus.PAID}>{t("invoices.statusPaid")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="date">Invoice Date *</Label>
+          <Label htmlFor="date">{t("invoices.invoiceDate")} *</Label>
           <Input
             id="date"
             type="date"
@@ -356,7 +358,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="dueDate">Due Date *</Label>
+          <Label htmlFor="dueDate">{t("invoices.dueDate")} *</Label>
           <Input
             id="dueDate"
             type="date"
@@ -368,7 +370,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="poNumber">PO Number</Label>
+          <Label htmlFor="poNumber">{t("invoices.poNumber")}</Label>
           <Input
             id="poNumber"
             placeholder="e.g. PO-89412"
@@ -379,7 +381,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="salesRep">Sales Rep</Label>
+          <Label htmlFor="salesRep">{t("invoices.salesRep")}</Label>
           <Input
             id="salesRep"
             placeholder="e.g. Li Mo"
@@ -394,7 +396,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       {/* Ship To / Jobsite Delivery Address */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="shipTo">Ship To / Jobsite Delivery Address</Label>
+          <Label htmlFor="shipTo">{t("invoices.shipTo")}</Label>
           <span className="text-xs text-muted-foreground">
             Appears on Invoice Detail, Printed Invoice & Packing List
           </span>
@@ -413,18 +415,18 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       {/* Line Items */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Line Items</h3>
-          <Button type="button" variant="outline" size="sm" onClick={addItem}>
+          <h3 className="text-lg font-semibold">{t("invoices.itemDescription")}</h3>
+          <Button type="button" variant="outline" size="sm" onClick={addItem} className="cursor-pointer">
             <Plus className="mr-2 h-4 w-4" />
-            Add Item
+            {t("common.addItem")}
           </Button>
         </div>
         <div className="border rounded-lg">
           <div className="grid grid-cols-12 gap-2 p-2 bg-muted font-medium text-sm">
-            <div className="col-span-4">Product/Description</div>
-            <div className="col-span-2">Quantity</div>
-            <div className="col-span-2">Rate</div>
-            <div className="col-span-2">Amount</div>
+            <div className="col-span-4">{t("invoices.itemSku")} / {t("common.description")}</div>
+            <div className="col-span-2">{t("common.quantity")}</div>
+            <div className="col-span-2">{t("common.rate")}</div>
+            <div className="col-span-2">{t("common.amount")}</div>
             <div className="col-span-2"></div>
           </div>
           {formData.items.map((item, index) => (
@@ -437,10 +439,10 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select product" />
+                    <SelectValue placeholder={t("invoices.addCustomItem")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="custom">Custom</SelectItem>
+                    <SelectItem value="custom">{t("invoices.addCustomItem")}</SelectItem>
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name}
@@ -450,7 +452,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
                 </Select>
                 <Input
                   className="mt-2"
-                  placeholder="Description"
+                  placeholder={t("common.description")}
                   value={item.description}
                   onChange={(e) =>
                     handleItemChange(index, "description", e.target.value)
@@ -482,16 +484,17 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
                   required
                 />
               </div>
-              <div className="col-span-2 flex items-center">
+              <div className="col-span-2 flex items-center font-medium">
                 {`$${Number(item.amount).toFixed(2)}`}
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 flex items-center justify-end">
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => removeItem(index)}
                   disabled={formData.items.length === 1}
+                  className="cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -505,12 +508,12 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       <div className="flex justify-end">
         <div className="w-full max-w-md space-y-2">
           <div className="flex justify-between">
-            <span>Subtotal:</span>
+            <span>{t("common.subtotal")}:</span>
             <span>{`$${Number(subtotal || 0).toFixed(2)}`}</span>
           </div>
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
-              <Label htmlFor="taxRate">Tax Rate (%):</Label>
+              <Label htmlFor="taxRate">{t("invoices.taxRate")}:</Label>
               <Input
                 id="taxRate"
                 type="number"
@@ -531,7 +534,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           </div>
           <div className="flex justify-between">
             <div className="flex items-center gap-2">
-              <Label htmlFor="discount">Discount:</Label>
+              <Label htmlFor="discount">{t("common.discount")}:</Label>
               <Input
                 id="discount"
                 type="number"
@@ -550,7 +553,7 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
             <span>{`-$${Number(formData.discount || 0).toFixed(2)}`}</span>
           </div>
           <div className="flex justify-between font-bold text-lg border-t pt-2">
-            <span>Total:</span>
+            <span>{t("common.total")}:</span>
             <span>{`$${Number(total || 0).toFixed(2)}`}</span>
           </div>
         </div>
@@ -560,15 +563,15 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
         <div className="flex items-center justify-between">
           <Label htmlFor="sideMark" className="font-semibold text-amber-900 dark:text-amber-300">
-            Side Mark (Internal / Warehouse)
+            {t("invoices.sideMarkLabel")}
           </Label>
           <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            Internal Note &bull; Will not show on printout invoice
+            {t("invoices.sideMarkHelp")}
           </span>
         </div>
         <Textarea
           id="sideMark"
-          placeholder="Enter side mark, warehouse instructions, bundle tags, jobsite notes..."
+          placeholder={t("invoices.sideMarkPlaceholder")}
           value={formData.sideMark}
           onChange={(e) =>
             setFormData({ ...formData, sideMark: e.target.value })
@@ -581,10 +584,10 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       {/* Notes and Terms */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="notes">Notes (Customer Visible)</Label>
+          <Label htmlFor="notes">{t("common.notes")}</Label>
           <Textarea
             id="notes"
-            placeholder="Notes shown on invoice..."
+            placeholder={t("invoices.deliveryInstructions")}
             value={formData.notes}
             onChange={(e) =>
               setFormData({ ...formData, notes: e.target.value })
@@ -593,10 +596,10 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="terms">Terms & Conditions</Label>
+          <Label htmlFor="terms">{t("common.terms")}</Label>
           <Textarea
             id="terms"
-            placeholder="Payment terms, restocking policy..."
+            placeholder={t("invoices.termsAndConditions")}
             value={formData.terms}
             onChange={(e) =>
               setFormData({ ...formData, terms: e.target.value })
@@ -609,15 +612,15 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       {error && <div className="text-sm text-destructive">{error}</div>}
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+        <Button type="button" variant="outline" onClick={onCancel} className="cursor-pointer">
+          {t("common.cancel")}
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button type="submit" disabled={loading} className="cursor-pointer">
           {loading
-            ? "Saving..."
+            ? t("common.saving")
             : invoice?.id
-            ? "Update Invoice"
-            : "Create Invoice"}
+            ? t("invoices.editInvoice")
+            : t("invoices.newInvoice")}
         </Button>
       </div>
     </form>

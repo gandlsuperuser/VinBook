@@ -34,6 +34,7 @@ import { ArrowLeft, Mail, Download, FileText, Pencil, Trash2, Copy, Package, Loa
 import { EstimateStatus } from "@prisma/client";
 import { EstimateForm } from "@/components/estimates/estimate-form";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
+import { useLanguage } from "@/components/providers/language-context";
 
 interface Estimate {
   id: string;
@@ -82,6 +83,7 @@ interface Estimate {
 export default function EstimateDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { t } = useLanguage();
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [loading, setLoading] = useState(true);
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
@@ -92,6 +94,17 @@ export default function EstimateDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [generatingPackingList, setGeneratingPackingList] = useState(false);
+
+  const getStatusLabel = (status: EstimateStatus) => {
+    switch (status) {
+      case EstimateStatus.ACCEPTED: return t("estimates.statusAccepted");
+      case EstimateStatus.SENT: return t("estimates.statusSent");
+      case EstimateStatus.DRAFT: return t("estimates.statusDraft");
+      case EstimateStatus.REJECTED: return t("estimates.statusRejected");
+      case EstimateStatus.EXPIRED: return t("estimates.statusExpired");
+      default: return status;
+    }
+  };
 
   const handleDownloadPackingList = async () => {
     if (!estimate) return;
@@ -423,7 +436,7 @@ export default function EstimateDetailPage() {
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Quote / Estimate</DialogTitle>
+            <DialogTitle>{t("estimates.editEstimate")}</DialogTitle>
             <DialogDescription>
               Update quote information
             </DialogDescription>
@@ -445,9 +458,9 @@ export default function EstimateDetailPage() {
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Quote / Estimate</DialogTitle>
+            <DialogTitle>{t("common.delete")} {estimate?.number}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this quote? This action cannot be undone.
+              {t("common.confirmDelete")} {t("common.cannotUndo")}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 mt-4">
@@ -455,15 +468,17 @@ export default function EstimateDetailPage() {
               variant="outline"
               onClick={() => setIsDeleteDialogOpen(false)}
               disabled={deleting}
+              className="cursor-pointer"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteEstimate}
               disabled={deleting}
+              className="cursor-pointer"
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? t("common.loading") : t("common.delete")}
             </Button>
           </div>
         </DialogContent>
@@ -480,7 +495,7 @@ export default function EstimateDetailPage() {
             <h1 className="text-3xl font-bold tracking-tight">
               {estimate.number}
             </h1>
-            <p className="text-muted-foreground">Quote / Estimate Details</p>
+            <p className="text-muted-foreground">{t("estimates.estimateDetails")}</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -488,69 +503,73 @@ export default function EstimateDetailPage() {
             <Button
               variant="outline"
               onClick={() => setIsEditDialogOpen(true)}
+              className="cursor-pointer"
             >
               <Pencil className="mr-2 h-4 w-4" />
-              Edit Quote
+              {t("estimates.editEstimate")}
             </Button>
           )}
-          <Button variant="outline">
+          <Button variant="outline" className="cursor-pointer">
             <Mail className="mr-2 h-4 w-4" />
-            Send Email
+            {t("common.sendEmail")}
           </Button>
           <Button
             variant="outline"
             onClick={handleDuplicateEstimate}
             disabled={duplicating}
+            className="cursor-pointer"
           >
             <Copy className="mr-2 h-4 w-4" />
-            {duplicating ? "Duplicating..." : "Duplicate"}
+            {duplicating ? t("common.duplicating") : t("common.duplicate")}
           </Button>
           <Button
             variant="outline"
             onClick={handleDownloadPDF}
             disabled={isGeneratingPDF}
+            className="cursor-pointer"
           >
             <Download className="mr-2 h-4 w-4" />
-            {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
+            {isGeneratingPDF ? t("common.generatingPdf") : t("common.downloadPdf")}
           </Button>
           <Button
             variant="outline"
             onClick={handleDownloadPackingList}
             disabled={generatingPackingList}
-            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-            title="Generate and download packing list"
+            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 cursor-pointer"
+            title={t("common.packingList")}
           >
             {generatingPackingList ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin text-indigo-600" />
             ) : (
               <Package className="mr-2 h-4 w-4 text-indigo-600" />
             )}
-            Packing List
+            {t("common.packingList")}
           </Button>
           <Button
             variant="destructive"
             onClick={() => setIsDeleteDialogOpen(true)}
+            className="cursor-pointer"
           >
             <Trash2 className="mr-2 h-4 w-4" />
-            Delete
+            {t("common.delete")}
           </Button>
 
           {estimate.status === EstimateStatus.DRAFT && (
-            <Button onClick={() => handleStatusUpdate(EstimateStatus.SENT)}>
-              Mark as Sent
+            <Button onClick={() => handleStatusUpdate(EstimateStatus.SENT)} className="cursor-pointer">
+              {t("estimates.markSent")}
             </Button>
           )}
           {estimate.status === EstimateStatus.SENT && (
-            <Button onClick={() => handleStatusUpdate(EstimateStatus.ACCEPTED)}>
-              Mark as Accepted
+            <Button onClick={() => handleStatusUpdate(EstimateStatus.ACCEPTED)} className="cursor-pointer">
+              {t("estimates.markAccepted")}
             </Button>
           )}
 
           {!estimate.convertedToInvoice && (
             <>
-              <Button onClick={() => setIsConvertDialogOpen(true)}>
+              <Button onClick={() => setIsConvertDialogOpen(true)} className="cursor-pointer">
                 <FileText className="mr-2 h-4 w-4" />
-                Convert to Invoice
+                {t("estimates.convertToInvoice")}
               </Button>
               <Dialog
                 open={isConvertDialogOpen}
@@ -558,24 +577,25 @@ export default function EstimateDetailPage() {
               >
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Convert Estimate to Invoice</DialogTitle>
+                    <DialogTitle>{t("estimates.convertDialogTitle")}</DialogTitle>
                     <DialogDescription>
-                      This will create a new invoice from this quote/estimate. The
-                      estimate will be marked as converted.
+                      {t("estimates.convertDialogDesc")}
                     </DialogDescription>
                   </DialogHeader>
                   <div className="flex justify-end gap-2 mt-4">
                     <Button
                       variant="outline"
                       onClick={() => setIsConvertDialogOpen(false)}
+                      className="cursor-pointer"
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       onClick={handleConvertToInvoice}
                       disabled={converting}
+                      className="cursor-pointer"
                     >
-                      {converting ? "Converting..." : "Convert"}
+                      {converting ? t("estimates.converting") : t("estimates.convertToInvoice")}
                     </Button>
                   </div>
                 </DialogContent>
@@ -583,9 +603,9 @@ export default function EstimateDetailPage() {
             </>
           )}
           {estimate.convertedToInvoice && estimate.convertedInvoiceId && (
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="cursor-pointer">
               <Link href={`/dashboard/invoices/${estimate.convertedInvoiceId}`}>
-                View Invoice
+                {t("estimates.viewInvoice")}
               </Link>
             </Button>
           )}
@@ -597,7 +617,7 @@ export default function EstimateDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>From</span>
+              <span>{t("invoices.from")}</span>
               {estimate.organization?.settings?.logoUrl && (
                 <img
                   src={estimate.organization.settings.logoUrl}
@@ -654,7 +674,7 @@ export default function EstimateDetailPage() {
         {/* Customer Information */}
         <Card>
           <CardHeader>
-            <CardTitle>Bill To</CardTitle>
+            <CardTitle>{t("invoices.billTo")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -695,7 +715,7 @@ export default function EstimateDetailPage() {
         {estimate.shipTo && (
           <Card>
             <CardHeader>
-              <CardTitle>Ship / Deliver To</CardTitle>
+              <CardTitle>{t("invoices.shipTo")}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm whitespace-pre-wrap font-medium">{estimate.shipTo}</p>
@@ -706,48 +726,48 @@ export default function EstimateDetailPage() {
         {/* Estimate Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Quote Summary</CardTitle>
+            <CardTitle>{t("estimates.estimateDetails")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Status:</span>
+              <span className="text-muted-foreground">{t("common.status")}:</span>
               <span
-                className={`px-2 py-1 rounded text-xs ${
+                className={`px-2 py-1 rounded text-xs font-semibold ${
                   estimate.status === EstimateStatus.ACCEPTED
-                    ? "bg-green-100 text-green-800"
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
                     : estimate.status === EstimateStatus.SENT
-                    ? "bg-blue-100 text-blue-800"
+                    ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                     : estimate.status === EstimateStatus.REJECTED
-                    ? "bg-red-100 text-red-800"
+                    ? "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
                     : isExpired
-                    ? "bg-gray-100 text-gray-800"
-                    : "bg-gray-100 text-gray-800"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                    : "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300"
                 }`}
               >
-                {isExpired ? "EXPIRED" : estimate.status}
-                {estimate.convertedToInvoice && " (Converted)"}
+                {isExpired ? t("estimates.statusExpired") : getStatusLabel(estimate.status)}
+                {estimate.convertedToInvoice && ` (${t("estimates.converted")})`}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">PO Number:</span>
+              <span className="text-muted-foreground">{t("invoices.poNumber")}:</span>
               <span className="font-medium">{estimate.poNumber || "-"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Sales Rep:</span>
+              <span className="text-muted-foreground">{t("invoices.salesRep")}:</span>
               <span className="font-medium">{estimate.salesRep || "-"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Date:</span>
+              <span className="text-muted-foreground">{t("common.date")}:</span>
               <span>{new Date(estimate.date).toLocaleDateString()}</span>
             </div>
             {estimate.expiryDate && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Expiry Date:</span>
+                <span className="text-muted-foreground">{t("estimates.expiryDate")}:</span>
                 <span>{new Date(estimate.expiryDate).toLocaleDateString()}</span>
               </div>
             )}
             <div className="flex justify-between font-medium">
-              <span>Total:</span>
+              <span>{t("common.total")}:</span>
               <span>${Number(estimate.total).toLocaleString()}</span>
             </div>
           </CardContent>
@@ -757,16 +777,16 @@ export default function EstimateDetailPage() {
       {/* Estimate Items */}
       <Card>
         <CardHeader>
-          <CardTitle>Line Items</CardTitle>
+          <CardTitle>{t("invoices.itemDescription")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Description</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>{t("common.description")}</TableHead>
+                <TableHead>{t("common.quantity")}</TableHead>
+                <TableHead>{t("common.rate")}</TableHead>
+                <TableHead className="text-right">{t("common.amount")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -792,23 +812,23 @@ export default function EstimateDetailPage() {
           <div className="mt-4 flex justify-end">
             <div className="w-full max-w-md space-y-2">
               <div className="flex justify-between">
-                <span>Subtotal:</span>
+                <span>{t("common.subtotal")}:</span>
                 <span>${Number(estimate.subtotal).toLocaleString()}</span>
               </div>
               {estimate.tax > 0 && (
                 <div className="flex justify-between">
-                  <span>Tax:</span>
+                  <span>{t("common.tax")}:</span>
                   <span>${Number(estimate.tax).toLocaleString()}</span>
                 </div>
               )}
               {estimate.discount > 0 && (
                 <div className="flex justify-between">
-                  <span>Discount:</span>
+                  <span>{t("common.discount")}:</span>
                   <span>-${Number(estimate.discount).toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-lg border-t pt-2">
-                <span>Total:</span>
+                <span>{t("common.total")}:</span>
                 <span>${Number(estimate.total).toLocaleString()}</span>
               </div>
             </div>
@@ -820,12 +840,12 @@ export default function EstimateDetailPage() {
       {estimate.sideMark && (
         <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base text-amber-900 dark:text-amber-300 flex items-center justify-between">
-              <span>Side Mark (Internal / Warehouse)</span>
-              <span className="text-xs font-normal text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 rounded">
-                Hidden from printout quote & PDF
-              </span>
+            <CardTitle className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+              {t("invoices.sideMarkLabel")}
             </CardTitle>
+            <CardDescription className="text-xs text-amber-700 dark:text-amber-400">
+              {t("invoices.sideMarkHelp")}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-sm whitespace-pre-wrap font-mono text-amber-950 dark:text-amber-100">{estimate.sideMark}</p>
@@ -839,7 +859,7 @@ export default function EstimateDetailPage() {
           {estimate.notes && (
             <Card>
               <CardHeader>
-                <CardTitle>Notes</CardTitle>
+                <CardTitle>{t("common.notes")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{estimate.notes}</p>
@@ -849,7 +869,7 @@ export default function EstimateDetailPage() {
           {estimate.terms && (
             <Card>
               <CardHeader>
-                <CardTitle>Terms & Conditions</CardTitle>
+                <CardTitle>{t("common.terms")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{estimate.terms}</p>

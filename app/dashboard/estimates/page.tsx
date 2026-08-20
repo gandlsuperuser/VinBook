@@ -54,6 +54,7 @@ import {
 import { EstimateForm } from "@/components/estimates/estimate-form";
 import { EstimateStatus } from "@prisma/client";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
+import { useLanguage } from "@/components/providers/language-context";
 
 interface Estimate {
   id: string;
@@ -96,23 +97,22 @@ export type EstimateColumnId =
 
 interface ColumnDefinition {
   id: EstimateColumnId;
-  label: string;
   defaultVisible: boolean;
   align?: "left" | "right";
 }
 
 const ALL_ESTIMATE_COLUMNS: ColumnDefinition[] = [
-  { id: "date", label: "Date", defaultVisible: true, align: "left" },
-  { id: "number", label: "Estimate #", defaultVisible: true, align: "left" },
-  { id: "customer", label: "Customer", defaultVisible: true, align: "left" },
-  { id: "sideMark", label: "Side Mark", defaultVisible: true, align: "left" },
-  { id: "status", label: "Status", defaultVisible: true, align: "left" },
-  { id: "amount", label: "Amount", defaultVisible: true, align: "right" },
-  { id: "expiryDate", label: "Expiry Date", defaultVisible: false, align: "left" },
-  { id: "poNumber", label: "PO Number", defaultVisible: false, align: "left" },
-  { id: "salesRep", label: "Sales Rep", defaultVisible: false, align: "left" },
-  { id: "shipTo", label: "Ship To", defaultVisible: false, align: "left" },
-  { id: "actions", label: "Actions", defaultVisible: true, align: "right" },
+  { id: "date", defaultVisible: true, align: "left" },
+  { id: "number", defaultVisible: true, align: "left" },
+  { id: "customer", defaultVisible: true, align: "left" },
+  { id: "sideMark", defaultVisible: true, align: "left" },
+  { id: "status", defaultVisible: true, align: "left" },
+  { id: "amount", defaultVisible: true, align: "right" },
+  { id: "expiryDate", defaultVisible: false, align: "left" },
+  { id: "poNumber", defaultVisible: false, align: "left" },
+  { id: "salesRep", defaultVisible: false, align: "left" },
+  { id: "shipTo", defaultVisible: false, align: "left" },
+  { id: "actions", defaultVisible: true, align: "right" },
 ];
 
 function formatLocalYMD(d: Date): string {
@@ -231,6 +231,7 @@ function getDateRangeForPreset(
 
 export default function EstimatesPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [summary, setSummary] = useState<EstimateSummary>({
     totalCount: 0,
@@ -250,10 +251,11 @@ export default function EstimatesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [convertingId, setConvertingId] = useState<string | null>(null);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   const [generatingPackingListId, setGeneratingPackingListId] = useState<string | null>(null);
 
-  // Dynamic movable and customizable columns state
+  // Columns & customizer
   const [columnOrder, setColumnOrder] = useState<EstimateColumnId[]>(() =>
     ALL_ESTIMATE_COLUMNS.map((c) => c.id)
   );
@@ -263,10 +265,26 @@ export default function EstimatesPage() {
   const [draggedColIndex, setDraggedColIndex] = useState<number | null>(null);
   const [dragOverColIndex, setDragOverColIndex] = useState<number | null>(null);
 
-  // Load configuration from localStorage
+  const getColumnLabel = (id: EstimateColumnId): string => {
+    switch (id) {
+      case "date": return t("columns.date");
+      case "number": return t("columns.estimateNumber");
+      case "customer": return t("columns.customer");
+      case "sideMark": return t("columns.sideMark");
+      case "status": return t("columns.status");
+      case "amount": return t("columns.amount");
+      case "expiryDate": return t("columns.expiryDate");
+      case "poNumber": return t("columns.poNumber");
+      case "salesRep": return t("columns.salesRep");
+      case "shipTo": return t("columns.shipTo");
+      case "actions": return t("columns.actions");
+      default: return id;
+    }
+  };
+
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("vinbook_estimates_columns_config_v2");
+      const saved = localStorage.getItem("vinbook_estimates_columns_config_v1");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed.order) && Array.isArray(parsed.visible)) {
@@ -277,7 +295,6 @@ export default function EstimatesPage() {
           ALL_ESTIMATE_COLUMNS.forEach((c) => {
             if (!mergedOrder.includes(c.id)) mergedOrder.push(c.id);
           });
-
           setColumnOrder(mergedOrder);
           setVisibleColumns(new Set(parsed.visible));
         }
@@ -287,11 +304,10 @@ export default function EstimatesPage() {
     }
   }, []);
 
-  // Save configuration to localStorage
   const saveColumnConfig = (order: EstimateColumnId[], visible: Set<EstimateColumnId>) => {
     try {
       localStorage.setItem(
-        "vinbook_estimates_columns_config_v2",
+        "vinbook_estimates_columns_config_v1",
         JSON.stringify({
           order,
           visible: Array.from(visible),
@@ -305,7 +321,7 @@ export default function EstimatesPage() {
   const toggleColumnVisibility = (colId: EstimateColumnId) => {
     const updated = new Set(visibleColumns);
     if (updated.has(colId)) {
-      if (updated.size <= 1) return; // Keep at least one column
+      if (updated.size <= 1) return;
       updated.delete(colId);
     } else {
       updated.add(colId);
@@ -324,7 +340,6 @@ export default function EstimatesPage() {
     saveColumnConfig(defaultOrder, defaultVisible);
   };
 
-  // Drag & drop column reordering
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedColIndex(index);
     e.dataTransfer.setData("text/plain", `${index}`);
@@ -375,25 +390,6 @@ export default function EstimatesPage() {
     columnOrder.some((id, idx) => id !== ALL_ESTIMATE_COLUMNS[idx]?.id) ||
     visibleColumns.size !== ALL_ESTIMATE_COLUMNS.filter((c) => c.defaultVisible).length ||
     !ALL_ESTIMATE_COLUMNS.filter((c) => c.defaultVisible).every((c) => visibleColumns.has(c.id));
-
-  const handleDownloadPackingList = async (estimateId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      setGeneratingPackingListId(estimateId);
-      const res = await fetch(`/api/estimates/${estimateId}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch estimate details");
-      }
-      const data = await res.json();
-      await downloadPackingListPDF(data.estimate || data);
-    } catch (error) {
-      console.error("Error generating packing list:", error);
-      alert(`Failed to generate packing list: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setGeneratingPackingListId(null);
-    }
-  };
 
   useEffect(() => {
     fetchCustomers();
@@ -451,25 +447,80 @@ export default function EstimatesPage() {
     fetchEstimates();
   }, [page, search, statusFilter, customerFilter, dateFilter, customStartDate, customEndDate]);
 
-  const handleDuplicateEstimate = async (id: string) => {
-    setDuplicatingId(id);
+  const handleConvertToInvoice = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     try {
+      setConvertingId(id);
+      const response = await fetch(`/api/estimates/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ convertToInvoice: true }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.invoice?.id) {
+          router.push(`/dashboard/invoices/${data.invoice.id}`);
+        } else {
+          fetchEstimates();
+        }
+      } else {
+        const err = await response.json();
+        alert(err.error || "Failed to convert estimate to invoice");
+      }
+    } catch (error) {
+      console.error("Error converting estimate:", error);
+      alert("Failed to convert estimate to invoice");
+    } finally {
+      setConvertingId(null);
+    }
+  };
+
+  const handleDuplicate = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    try {
+      setDuplicatingId(id);
       const response = await fetch(`/api/estimates/${id}/duplicate`, {
         method: "POST",
       });
 
       if (response.ok) {
-        const newEstimate = await response.json();
-        router.push(`/dashboard/estimates/${newEstimate.id}`);
-      } else {
         const data = await response.json();
-        alert(data.error || "Failed to duplicate estimate");
-        setDuplicatingId(null);
+        fetchEstimates();
+        if (data.estimate?.id) {
+          router.push(`/dashboard/estimates/${data.estimate.id}`);
+        }
+      } else {
+        alert("Failed to duplicate estimate");
       }
     } catch (error) {
       console.error("Error duplicating estimate:", error);
       alert("Failed to duplicate estimate");
+    } finally {
       setDuplicatingId(null);
+    }
+  };
+
+  const handleDownloadPackingList = async (estimateId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setGeneratingPackingListId(estimateId);
+      const res = await fetch(`/api/estimates/${estimateId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch estimate details");
+      }
+      const data = await res.json();
+      await downloadPackingListPDF(data.estimate || data);
+    } catch (error) {
+      console.error("Error generating packing list:", error);
+      alert(`Failed to generate packing list: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGeneratingPackingListId(null);
     }
   };
 
@@ -481,12 +532,23 @@ export default function EstimatesPage() {
         return "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800";
       case EstimateStatus.DRAFT:
         return "bg-zinc-100 text-zinc-800 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700";
-      case EstimateStatus.EXPIRED:
-        return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800";
       case EstimateStatus.REJECTED:
         return "bg-red-100 text-red-800 border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800";
+      case EstimateStatus.EXPIRED:
+        return "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800";
       default:
         return "bg-zinc-100 text-zinc-800 border-zinc-300";
+    }
+  };
+
+  const getStatusLabel = (status: EstimateStatus) => {
+    switch (status) {
+      case EstimateStatus.ACCEPTED: return t("estimates.statusAccepted");
+      case EstimateStatus.SENT: return t("estimates.statusSent");
+      case EstimateStatus.DRAFT: return t("estimates.statusDraft");
+      case EstimateStatus.REJECTED: return t("estimates.statusRejected");
+      case EstimateStatus.EXPIRED: return t("estimates.statusExpired");
+      default: return status;
     }
   };
 
@@ -495,30 +557,30 @@ export default function EstimatesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Estimates & Quotes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("estimates.title")}</h1>
           <p className="text-muted-foreground">
-            Create, track, and convert proposals to invoices
+            {t("estimates.subtitle")}
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={() => setEditingEstimate(null)}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm cursor-pointer"
             >
               <Plus className="mr-2 h-4 w-4" />
-              New Estimate
+              {t("estimates.newEstimate")}
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
-                {editingEstimate ? "Edit Estimate" : "Create New Estimate"}
+                {editingEstimate ? t("estimates.editEstimate") : t("estimates.newEstimate")}
               </DialogTitle>
               <DialogDescription>
                 {editingEstimate
-                  ? "Update estimate details"
-                  : "Fill in the details to create a new quote / estimate"}
+                  ? "Update quote/estimate proposal"
+                  : "Fill in the details to create a new commercial estimate"}
               </DialogDescription>
             </DialogHeader>
             <EstimateForm
@@ -537,12 +599,12 @@ export default function EstimatesPage() {
         </Dialog>
       </div>
 
-      {/* Summary KPI Cards */}
+      {/* KPI Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">
-              Total Estimates
+              {t("estimates.totalEstimates")}
             </span>
             <Sparkles className="h-4 w-4 text-primary" />
           </div>
@@ -550,14 +612,14 @@ export default function EstimatesPage() {
             ${summary.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {summary.totalCount} {summary.totalCount === 1 ? "quote" : "quotes"} in selected date filter
+            {summary.totalCount} {t("estimates.quotesInFilter")}
           </p>
         </div>
 
         <div className="rounded-xl border bg-card p-4 shadow-sm border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/20 dark:bg-emerald-950/10">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-              Accepted Proposals
+              {t("estimates.acceptedProposals")}
             </span>
             <FileCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
@@ -565,7 +627,7 @@ export default function EstimatesPage() {
             ${summary.acceptedAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
-            {summary.acceptedCount} accepted {summary.acceptedCount === 1 ? "estimate" : "estimates"}
+            {summary.acceptedCount} {t("estimates.acceptedEstimates")}
           </p>
         </div>
       </div>
@@ -575,7 +637,7 @@ export default function EstimatesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-semibold text-foreground">Date Range Filter:</span>
+            <span className="text-sm font-semibold text-foreground">{t("common.dateRange")}</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -584,21 +646,21 @@ export default function EstimatesPage() {
                 <SelectValue placeholder="Select Date Range" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="yesterday">Yesterday</SelectItem>
-                <SelectItem value="this_week">This Week</SelectItem>
-                <SelectItem value="last_week">Last Week</SelectItem>
-                <SelectItem value="this_month">This Month</SelectItem>
-                <SelectItem value="last_month">Last Month</SelectItem>
-                <SelectItem value="last_30_days">Last 30 Days</SelectItem>
-                <SelectItem value="this_quarter">This Quarter</SelectItem>
-                <SelectItem value="last_quarter">Last Quarter</SelectItem>
-                <SelectItem value="last_3_months">Last 3 Months</SelectItem>
-                <SelectItem value="this_year">This Year</SelectItem>
-                <SelectItem value="last_year">Last Year</SelectItem>
-                <SelectItem value="last_12_months">Last 12 Months</SelectItem>
-                <SelectItem value="custom">Custom Date Range</SelectItem>
+                <SelectItem value="all">{t("datePresets.all")}</SelectItem>
+                <SelectItem value="today">{t("datePresets.today")}</SelectItem>
+                <SelectItem value="yesterday">{t("datePresets.yesterday")}</SelectItem>
+                <SelectItem value="this_week">{t("datePresets.this_week")}</SelectItem>
+                <SelectItem value="last_week">{t("datePresets.last_week")}</SelectItem>
+                <SelectItem value="this_month">{t("datePresets.this_month")}</SelectItem>
+                <SelectItem value="last_month">{t("datePresets.last_month")}</SelectItem>
+                <SelectItem value="last_30_days">{t("datePresets.last_30_days")}</SelectItem>
+                <SelectItem value="this_quarter">{t("datePresets.this_quarter")}</SelectItem>
+                <SelectItem value="last_quarter">{t("datePresets.last_quarter")}</SelectItem>
+                <SelectItem value="last_3_months">{t("datePresets.last_3_months")}</SelectItem>
+                <SelectItem value="this_year">{t("datePresets.this_year")}</SelectItem>
+                <SelectItem value="last_year">{t("datePresets.last_year")}</SelectItem>
+                <SelectItem value="last_12_months">{t("datePresets.last_12_months")}</SelectItem>
+                <SelectItem value="custom">{t("datePresets.custom")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -611,7 +673,7 @@ export default function EstimatesPage() {
                   className="h-9 w-[140px]"
                   placeholder="Start Date"
                 />
-                <span className="text-muted-foreground text-xs">to</span>
+                <span className="text-muted-foreground text-xs">{t("common.to")}</span>
                 <Input
                   type="date"
                   value={customEndDate}
@@ -627,21 +689,21 @@ export default function EstimatesPage() {
         {/* Quick Date Presets Strip */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/50 text-xs">
           <span className="text-muted-foreground mr-1 text-[11px] uppercase tracking-wider font-semibold">
-            Quick:
+            {t("common.quick")}
           </span>
           {[
-            { key: "all", label: "All Time" },
-            { key: "this_month", label: "This Month" },
-            { key: "last_month", label: "Last Month" },
-            { key: "this_quarter", label: "This Quarter" },
-            { key: "this_year", label: "This Year" },
-            { key: "last_30_days", label: "Last 30 Days" },
+            { key: "all", label: t("datePresets.all") },
+            { key: "this_month", label: t("datePresets.this_month") },
+            { key: "last_month", label: t("datePresets.last_month") },
+            { key: "this_quarter", label: t("datePresets.this_quarter") },
+            { key: "this_year", label: t("datePresets.this_year") },
+            { key: "last_30_days", label: t("datePresets.last_30_days") },
           ].map((preset) => (
             <button
               key={preset.key}
               type="button"
               onClick={() => setDateFilter(preset.key)}
-              className={`px-2.5 py-1 rounded-md transition-colors ${
+              className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                 dateFilter === preset.key
                   ? "bg-primary text-primary-foreground font-medium shadow-xs"
                   : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
@@ -659,7 +721,7 @@ export default function EstimatesPage() {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by estimate #, customer, side mark, PO #, sales rep..."
+              placeholder={t("estimates.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8"
@@ -667,23 +729,23 @@ export default function EstimatesPage() {
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-[150px]">
-              <SelectValue placeholder="Status" />
+              <SelectValue placeholder={t("common.status")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="DRAFT">Draft</SelectItem>
-              <SelectItem value="SENT">Sent</SelectItem>
-              <SelectItem value="ACCEPTED">Accepted</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-              <SelectItem value="EXPIRED">Expired</SelectItem>
+              <SelectItem value="all">{t("common.allStatuses")}</SelectItem>
+              <SelectItem value="DRAFT">{t("estimates.statusDraft")}</SelectItem>
+              <SelectItem value="SENT">{t("estimates.statusSent")}</SelectItem>
+              <SelectItem value="ACCEPTED">{t("estimates.statusAccepted")}</SelectItem>
+              <SelectItem value="REJECTED">{t("estimates.statusRejected")}</SelectItem>
+              <SelectItem value="EXPIRED">{t("estimates.statusExpired")}</SelectItem>
             </SelectContent>
           </Select>
           <Select value={customerFilter} onValueChange={setCustomerFilter}>
             <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Customer" />
+              <SelectValue placeholder={t("common.customer")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
+              <SelectItem value="all">{t("common.allCustomers")}</SelectItem>
               {customers.map((customer) => (
                 <SelectItem key={customer.id} value={customer.id}>
                   {customer.name}
@@ -700,15 +762,15 @@ export default function EstimatesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className={`h-9 px-3 gap-2 ${
+                className={`h-9 px-3 gap-2 cursor-pointer ${
                   isCustomized
                     ? "border-primary/50 text-primary bg-primary/5"
                     : "text-muted-foreground"
                 }`}
-                title="Customize table columns & layout"
+                title={t("columns.dragToReorder")}
               >
                 <Settings2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Columns</span>
+                <span className="hidden sm:inline">{t("common.columns")}</span>
                 {isCustomized && (
                   <span className="h-2 w-2 rounded-full bg-primary" />
                 )}
@@ -717,21 +779,21 @@ export default function EstimatesPage() {
             <DropdownMenuContent align="end" className="w-64 p-2">
               <div className="flex items-center justify-between px-2 py-1.5">
                 <DropdownMenuLabel className="p-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Visible Columns
+                  {t("columns.visibleColumns")}
                 </DropdownMenuLabel>
                 {isCustomized && (
                   <button
                     onClick={resetColumnsToDefault}
                     className="text-xs text-primary hover:underline flex items-center gap-1 cursor-pointer"
-                    title="Reset to default columns and order"
+                    title={t("columns.reset")}
                   >
                     <RotateCcw className="h-3 w-3" />
-                    Reset
+                    {t("columns.reset")}
                   </button>
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground px-2 pb-2 leading-relaxed">
-                Check columns to show/hide. Drag table headers left or right to reorder.
+                {t("columns.dragToReorder")}
               </p>
               <DropdownMenuSeparator />
               <div className="space-y-1 py-1">
@@ -742,7 +804,7 @@ export default function EstimatesPage() {
                     onCheckedChange={() => toggleColumnVisibility(col.id)}
                     className="text-sm cursor-pointer"
                   >
-                    {col.label}
+                    {getColumnLabel(col.id)}
                   </DropdownMenuCheckboxItem>
                 ))}
               </div>
@@ -751,7 +813,7 @@ export default function EstimatesPage() {
         </div>
       </div>
 
-      {/* Estimates Table with Drag-to-Reorder Headers */}
+      {/* Table with Drag-to-Reorder Headers */}
       <div className="rounded-md border bg-card overflow-x-auto shadow-xs">
         <Table>
           <TableHeader>
@@ -780,7 +842,7 @@ export default function EstimatesPage() {
                         ? "border-l-2 border-primary bg-primary/10"
                         : ""
                     } ${isDragging ? "opacity-40" : ""}`}
-                    title={!isActions ? "Drag column to reorder" : undefined}
+                    title={!isActions ? t("columns.dragToReorder") : undefined}
                   >
                     <div
                       className={`inline-flex items-center gap-1.5 ${
@@ -791,7 +853,7 @@ export default function EstimatesPage() {
                         <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                       )}
                       <span className="font-semibold text-xs text-foreground uppercase tracking-wider">
-                        {col.label}
+                        {getColumnLabel(col.id)}
                       </span>
                     </div>
                   </TableHead>
@@ -808,7 +870,7 @@ export default function EstimatesPage() {
                 >
                   <div className="flex items-center justify-center gap-2 text-muted-foreground">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Loading estimates...</span>
+                    <span>{t("common.loading")}</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -818,7 +880,7 @@ export default function EstimatesPage() {
                   colSpan={activeVisibleColumns.length}
                   className="text-center py-10 text-muted-foreground"
                 >
-                  No estimates found for the selected filters
+                  {t("common.noResults")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -836,25 +898,27 @@ export default function EstimatesPage() {
                       case "number":
                         return (
                           <TableCell key={col.id} className="font-medium whitespace-nowrap">
-                            <Button
-                              variant="link"
-                              className="p-0 h-auto font-medium text-primary hover:underline cursor-pointer"
-                              onClick={() => handleDuplicateEstimate(estimate.id)}
-                              disabled={duplicatingId === estimate.id}
-                              title="Duplicate Estimate"
+                            <Link
+                              href={`/dashboard/estimates/${estimate.id}`}
+                              className="font-semibold text-primary hover:underline hover:text-blue-600 transition-colors inline-block"
                             >
-                              {duplicatingId === estimate.id ? "Duplicating..." : estimate.number}
-                            </Button>
+                              {estimate.number}
+                            </Link>
+                            {estimate.poNumber && !visibleColumns.has("poNumber") && (
+                              <div className="text-xs text-muted-foreground font-mono">
+                                PO: {estimate.poNumber}
+                              </div>
+                            )}
                           </TableCell>
                         );
 
                       case "customer":
                         return (
                           <TableCell key={col.id} className="font-medium">
-                            <div>{estimate.customer?.name || "-"}</div>
-                            {estimate.customer?.email && (
+                            <div className="font-medium text-zinc-900 dark:text-zinc-100">{estimate.customer.name}</div>
+                            {estimate.salesRep && !visibleColumns.has("salesRep") && (
                               <div className="text-xs text-muted-foreground">
-                                {estimate.customer.email}
+                                Rep: {estimate.salesRep}
                               </div>
                             )}
                           </TableCell>
@@ -862,10 +926,10 @@ export default function EstimatesPage() {
 
                       case "sideMark":
                         return (
-                          <TableCell key={col.id} className="max-w-[200px]">
+                          <TableCell key={col.id} className="max-w-[220px]">
                             {estimate.sideMark ? (
                               <span
-                                className="inline-block truncate max-w-full text-xs font-mono bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50 px-2 py-0.5 rounded"
+                                className="text-xs font-mono text-amber-900 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40 rounded px-2 py-0.5 inline-block truncate max-w-full"
                                 title={estimate.sideMark}
                               >
                                 {estimate.sideMark}
@@ -876,34 +940,10 @@ export default function EstimatesPage() {
                           </TableCell>
                         );
 
-                      case "status":
-                        return (
-                          <TableCell key={col.id}>
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(
-                                estimate.status
-                              )}`}
-                            >
-                              {estimate.status}
-                              {estimate.convertedToInvoice && " (Converted)"}
-                            </span>
-                          </TableCell>
-                        );
-
-                      case "amount":
-                        return (
-                          <TableCell key={col.id} className="text-right font-semibold whitespace-nowrap">
-                            ${Number(estimate.total).toLocaleString("en-US", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </TableCell>
-                        );
-
                       case "expiryDate":
                         return (
                           <TableCell key={col.id} className="text-xs text-muted-foreground whitespace-nowrap">
-                            {formatDateDisplay(estimate.expiryDate)}
+                            {estimate.expiryDate ? formatDateDisplay(estimate.expiryDate) : "-"}
                           </TableCell>
                         );
 
@@ -923,8 +963,38 @@ export default function EstimatesPage() {
 
                       case "shipTo":
                         return (
-                          <TableCell key={col.id} className="text-xs max-w-[180px] truncate" title={estimate.shipTo || ""}>
+                          <TableCell key={col.id} className="text-xs max-w-[200px] truncate" title={estimate.shipTo || undefined}>
                             {estimate.shipTo || "-"}
+                          </TableCell>
+                        );
+
+                      case "status":
+                        return (
+                          <TableCell key={col.id}>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getStatusColor(
+                                  estimate.status
+                                )}`}
+                              >
+                                {getStatusLabel(estimate.status)}
+                              </span>
+                              {estimate.convertedToInvoice && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {t("estimates.converted")}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        );
+
+                      case "amount":
+                        return (
+                          <TableCell key={col.id} className="text-right font-semibold whitespace-nowrap">
+                            ${Number(estimate.total).toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </TableCell>
                         );
 
@@ -937,7 +1007,7 @@ export default function EstimatesPage() {
                                 size="icon"
                                 asChild
                                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                title="View Quote / Estimate Details"
+                                title={t("common.view")}
                               >
                                 <Link href={`/dashboard/estimates/${estimate.id}`}>
                                   <Eye className="h-4 w-4" />
@@ -950,7 +1020,7 @@ export default function EstimatesPage() {
                                 onClick={(e) => handleDownloadPackingList(estimate.id, e)}
                                 disabled={generatingPackingListId === estimate.id}
                                 className="h-8 w-8 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                                title="Generate / Download Packing List"
+                                title={t("common.packingList")}
                               >
                                 {generatingPackingListId === estimate.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
@@ -959,15 +1029,39 @@ export default function EstimatesPage() {
                                 )}
                               </Button>
 
+                              {!estimate.convertedToInvoice && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 px-2 text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                                  onClick={(e) => handleConvertToInvoice(estimate.id, e)}
+                                  disabled={convertingId === estimate.id}
+                                  title={t("estimates.convertToInvoice")}
+                                >
+                                  {convertingId === estimate.id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="mr-1 h-3.5 w-3.5" />
+                                      <span className="hidden sm:inline">{t("estimates.convertToInvoice")}</span>
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDuplicateEstimate(estimate.id)}
-                                disabled={duplicatingId === estimate.id}
                                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                title="Duplicate Estimate"
+                                onClick={(e) => handleDuplicate(estimate.id, e)}
+                                disabled={duplicatingId === estimate.id}
+                                title={t("common.duplicate")}
                               >
-                                <Copy className="h-4 w-4" />
+                                {duplicatingId === estimate.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
                               </Button>
                             </div>
                           </TableCell>
@@ -992,17 +1086,17 @@ export default function EstimatesPage() {
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
           >
-            Previous
+            {t("common.previous")}
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+            {t("common.page")} {page} {t("common.of")} {totalPages}
           </span>
           <Button
             variant="outline"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
           >
-            Next
+            {t("common.next")}
           </Button>
         </div>
       )}
