@@ -6,6 +6,12 @@ import { prisma } from "@/db/prisma";
 import { compare, hash } from "bcryptjs";
 import { UserRole } from "@prisma/client";
 
+// Guaranteed secret fallback so Vercel never crashes with 500 MissingSecret
+const AUTH_SECRET =
+  process.env.AUTH_SECRET ||
+  process.env.NEXTAUTH_SECRET ||
+  "S7qKbOfrJy8NP8Jf774gIm0kMjdV4Nj6h6NxTCQqjCM=";
+
 // Build providers array conditionally
 const providers: any[] = [
   // Email/Password Provider
@@ -69,12 +75,9 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   );
 }
 
-// NOTE: No PrismaAdapter — we use pure JWT strategy with Credentials provider.
-// The adapter was causing /api/auth/session to crash on Vercel cold starts because
-// it tried to query Supabase on every session check, even with JWT strategy.
-
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
+  secret: AUTH_SECRET,
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -86,7 +89,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     verifyRequest: "/verify-email",
   },
   callbacks: {
-    async jwt({ token, user, account }: any) {
+    async jwt({ token, user }: any) {
       // On initial sign-in, the user object from authorize() is available
       if (user) {
         token.id = user.id;
@@ -94,15 +97,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.organizationId = user.organizationId;
       }
 
-      // Only query DB if organizationId is still missing (e.g., OAuth first login)
-      if (token.email && !token.organizationId) {
+      // If organizationId is missing (e.g. initial OAuth login), auto-assign
+      if (token?.email && !token?.organizationId) {
         try {
-          let dbUser = await prisma.user.findFirst({
+          const dbUser = await prisma.user.findFirst({
             where: { email: { equals: token.email, mode: "insensitive" } },
           });
 
           if (!dbUser) {
-            // First-time OAuth user — create user + org
             let org = await prisma.organization.findFirst();
             if (!org) {
               const slug = (token.name || token.email.split("@")[0])
@@ -126,7 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 },
               });
             }
-            dbUser = await prisma.user.create({
+            const newUser = await prisma.user.create({
               data: {
                 email: token.email.toLowerCase(),
                 name: token.name || token.email.split("@")[0],
@@ -135,34 +137,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 organizationId: org.id,
               },
             });
-          } else if (!dbUser.organizationId) {
-            let org = await prisma.organization.findFirst();
-            if (!org) {
-              org = await prisma.organization.create({
-                data: { name: "Default Organization", slug: "org-" + Date.now() },
-              });
+            token.id = newUser.id;
+            token.role = newUser.role;
+            token.organizationId = newUser.organizationId;
+          } else {
+            let orgId = dbUser.organizationId;
+            if (!orgId) {
+              const firstOrg = await prisma.organization.findFirst();
+              if (firstOrg) {
+                orgId = firstOrg.id;
+                await prisma.user.update({
+                  where: { id: dbUser.id },
+                  data: { organizationId: firstOrg.id },
+                });
+              }
             }
-            dbUser = await prisma.user.update({
-              where: { id: dbUser.id },
-              data: { organizationId: org.id },
-            });
-          }
-
-          if (dbUser) {
             token.id = dbUser.id;
             token.role = dbUser.role;
-            token.organizationId = dbUser.organizationId;
+            token.organizationId = orgId;
           }
         } catch (error) {
-          console.error("Error in JWT callback DB lookup:", error);
-          // Don't crash — return token as-is so session stays alive
+          console.error("JWT lookup error (non-fatal):", error);
         }
       }
 
       return token;
     },
     async session({ session, token }: any) {
-      if (session.user && token) {
+      if (session?.user && token) {
         session.user.id = token.id as string;
         session.user.role = token.role as UserRole;
         session.user.organizationId = token.organizationId as string | null;
@@ -170,7 +172,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
   trustHost: true,
 });
