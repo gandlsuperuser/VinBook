@@ -30,9 +30,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Mail, Download, FileText, Pencil, Trash2, Copy } from "lucide-react";
+import { ArrowLeft, Mail, Download, FileText, Pencil, Trash2, Copy, Package, Loader2 } from "lucide-react";
 import { EstimateStatus } from "@prisma/client";
 import { EstimateForm } from "@/components/estimates/estimate-form";
+import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
 
 interface Estimate {
   id: string;
@@ -90,6 +91,20 @@ export default function EstimateDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [generatingPackingList, setGeneratingPackingList] = useState(false);
+
+  const handleDownloadPackingList = async () => {
+    if (!estimate) return;
+    setGeneratingPackingList(true);
+    try {
+      await downloadPackingListPDF(estimate);
+    } catch (error) {
+      console.error("Error generating packing list:", error);
+      alert(`Failed to generate packing list: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGeneratingPackingList(false);
+    }
+  };
 
   useEffect(() => {
     fetchEstimate();
@@ -497,6 +512,20 @@ export default function EstimateDetailPage() {
           >
             <Download className="mr-2 h-4 w-4" />
             {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleDownloadPackingList}
+            disabled={generatingPackingList}
+            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+            title="Generate and download packing list"
+          >
+            {generatingPackingList ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin text-indigo-600" />
+            ) : (
+              <Package className="mr-2 h-4 w-4 text-indigo-600" />
+            )}
+            Packing List
           </Button>
           <Button
             variant="destructive"

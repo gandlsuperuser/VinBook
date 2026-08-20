@@ -65,8 +65,8 @@ export async function downloadPackingListPDF(invoice: any) {
             </div>
           </div>
           <div style="flex: 1; text-align: right; font-size: 13px; line-height: 1.6;">
-            <div style="font-size: 15px; font-weight: bold; margin-bottom: 6px;">Ref: PL-${invoice.number?.replace(/^INV-/, "") || invoice.number}</div>
-            <div style="margin-bottom: 4px;"><strong>Invoice #:</strong> ${invoice.number}</div>
+            <div style="font-size: 15px; font-weight: bold; margin-bottom: 6px;">Ref: PL-${invoice.number?.replace(/^(INV|EST)-/, "") || invoice.number}</div>
+            <div style="margin-bottom: 4px;"><strong>${invoice.number?.startsWith("EST") ? "Estimate / Quote #:" : "Invoice #:"}</strong> ${invoice.number}</div>
             ${invoice.poNumber ? `<div style="margin-bottom: 4px;"><strong>PO #:</strong> ${invoice.poNumber}</div>` : ""}
             ${invoice.salesRep ? `<div style="margin-bottom: 4px;"><strong>Sales Rep:</strong> ${invoice.salesRep}</div>` : ""}
             <div><strong>Date:</strong> ${invoice.date ? new Date(invoice.date).toLocaleDateString() : new Date().toLocaleDateString()}</div>

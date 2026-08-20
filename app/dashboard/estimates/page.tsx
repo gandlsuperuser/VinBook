@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Eye, Copy } from "lucide-react";
+import { Plus, Search, Eye, Copy, Package, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { EstimateForm } from "@/components/estimates/estimate-form";
 import { EstimateStatus } from "@prisma/client";
+import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
 
 interface Estimate {
   id: string;
@@ -59,6 +60,26 @@ export default function EstimatesPage() {
   const [editingEstimate, setEditingEstimate] = useState<Estimate | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  const [generatingPackingListId, setGeneratingPackingListId] = useState<string | null>(null);
+
+  const handleDownloadPackingList = async (estimateId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      setGeneratingPackingListId(estimateId);
+      const res = await fetch(`/api/estimates/${estimateId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch estimate details");
+      }
+      const data = await res.json();
+      await downloadPackingListPDF(data.estimate || data);
+    } catch (error) {
+      console.error("Error generating packing list:", error);
+      alert(`Failed to generate packing list: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setGeneratingPackingListId(null);
+    }
+  };
 
   const handleDuplicateEstimate = async (id: string) => {
     setDuplicatingId(id);
@@ -300,6 +321,20 @@ export default function EstimatesPage() {
                       <Link href={`/dashboard/estimates/${estimate.id}`}>
                         <Eye className="h-4 w-4" />
                       </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleDownloadPackingList(estimate.id, e)}
+                      disabled={generatingPackingListId === estimate.id}
+                      className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                      title="Generate / Download Packing List"
+                    >
+                      {generatingPackingListId === estimate.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                      ) : (
+                        <Package className="h-4 w-4" />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
