@@ -30,7 +30,7 @@ const estimateSchema = z.object({
 // GET - List estimates
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -112,7 +112,7 @@ export async function GET(request: Request) {
 // POST - Create estimate
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

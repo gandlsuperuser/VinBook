@@ -95,7 +95,7 @@ export async function GET(request: Request) {
 // POST - Create customer
 export async function POST(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
