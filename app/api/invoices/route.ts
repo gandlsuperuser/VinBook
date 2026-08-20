@@ -7,10 +7,10 @@ import { InvoiceStatus } from "@prisma/client";
 const invoiceItemSchema = z.object({
   productId: z.string().optional(),
   description: z.string().min(1),
-  quantity: z.number().min(0.01),
-  rate: z.number().min(0),
-  amount: z.number().min(0),
-  tax: z.number().min(0).optional(),
+  quantity: z.coerce.number().min(0.01),
+  rate: z.coerce.number().min(0),
+  amount: z.coerce.number().min(0),
+  tax: z.coerce.number().min(0).optional(),
 });
 
 const invoiceSchema = z.object({
@@ -19,10 +19,10 @@ const invoiceSchema = z.object({
   dueDate: z.string(),
   status: z.nativeEnum(InvoiceStatus),
   items: z.array(invoiceItemSchema).min(1, "At least one item is required"),
-  subtotal: z.number().min(0),
-  tax: z.number().min(0),
-  discount: z.number().min(0).optional(),
-  total: z.number().min(0),
+  subtotal: z.coerce.number().min(0),
+  tax: z.coerce.number().min(0),
+  discount: z.coerce.number().min(0).optional(),
+  total: z.coerce.number().min(0),
   poNumber: z.string().optional(),
   sideMark: z.string().optional(),
   salesRep: z.string().optional(),

@@ -7,10 +7,10 @@ import { EstimateStatus } from "@prisma/client";
 const estimateItemSchema = z.object({
   productId: z.string().optional(),
   description: z.string().min(1),
-  quantity: z.number().min(0.01),
-  rate: z.number().min(0),
-  amount: z.number().min(0),
-  tax: z.number().min(0).optional(),
+  quantity: z.coerce.number().min(0.01),
+  rate: z.coerce.number().min(0),
+  amount: z.coerce.number().min(0),
+  tax: z.coerce.number().min(0).optional(),
 });
 
 const estimateSchema = z.object({
@@ -19,10 +19,10 @@ const estimateSchema = z.object({
   expiryDate: z.string().optional(),
   status: z.nativeEnum(EstimateStatus),
   items: z.array(estimateItemSchema).min(1, "At least one item is required"),
-  subtotal: z.number().min(0),
-  tax: z.number().min(0),
-  discount: z.number().min(0).optional(),
-  total: z.number().min(0),
+  subtotal: z.coerce.number().min(0),
+  tax: z.coerce.number().min(0),
+  discount: z.coerce.number().min(0).optional(),
+  total: z.coerce.number().min(0),
   poNumber: z.string().optional(),
   sideMark: z.string().optional(),
   salesRep: z.string().optional(),
