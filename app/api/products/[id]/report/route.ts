@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -17,11 +17,20 @@ export async function GET(
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
 
+    let organizationId = user.organizationId;
+    if (!organizationId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { organizationId: true },
+      });
+      organizationId = dbUser?.organizationId || "";
+    }
+
     // Fetch product and organization
     const product = await prisma.product.findFirst({
       where: {
         id,
-        organizationId: user.organizationId,
+        ...(organizationId ? { organizationId } : {}),
       },
       include: {
         organization: {
@@ -38,6 +47,8 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    const targetOrgId = product.organizationId || organizationId;
+
     // Date filters for queries
     const dateFilter: any = {};
     if (startDate) {
@@ -50,37 +61,51 @@ export async function GET(
     }
 
     // 1. Fetch all Inventory Logs (When inventory was added, restocked, or adjusted)
-    const inventoryLogs = await prisma.inventoryLog.findMany({
-      where: {
-        productId: id,
-        organizationId: user.organizationId,
-        ...(startDate || endDate ? { createdAt: dateFilter } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    let inventoryLogs: any[] = [];
+    try {
+      inventoryLogs = await prisma.inventoryLog.findMany({
+        where: {
+          productId: id,
+          ...(startDate || endDate ? { createdAt: dateFilter } : {}),
+        },
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (logErr) {
+      console.warn("Could not query inventory logs:", logErr);
+      inventoryLogs = [];
+    }
 
     // 2. Fetch all Invoiced Sales & Pickups (When sold to customer, picked up by rep / driver)
-    const invoiceItems = await prisma.invoiceItem.findMany({
-      where: {
-        productId: id,
-        invoice: {
-          organizationId: user.organizationId,
-          ...(startDate || endDate ? { date: dateFilter } : {}),
+    let invoiceItems: any[] = [];
+    try {
+      invoiceItems = await prisma.invoiceItem.findMany({
+        where: {
+          productId: id,
+          ...(startDate || endDate
+            ? {
+                invoice: {
+                  date: dateFilter,
+                },
+              }
+            : {}),
         },
-      },
-      include: {
-        invoice: {
-          include: {
-            customer: true,
+        include: {
+          invoice: {
+            include: {
+              customer: true,
+            },
           },
         },
-      },
-      orderBy: {
-        invoice: {
-          date: "desc",
+        orderBy: {
+          invoice: {
+            date: "desc",
+          },
         },
-      },
-    });
+      });
+    } catch (invErr) {
+      console.warn("Could not query invoice items for report:", invErr);
+      invoiceItems = [];
+    }
 
     // Aggregate Customer Statistics (Who bought / picked up this product)
     const customerMap = new Map<
@@ -99,7 +124,9 @@ export async function GET(
     >();
 
     invoiceItems.forEach((item) => {
-      const cust = item.invoice.customer;
+      const cust = item.invoice?.customer;
+      if (!cust) return;
+
       const existing = customerMap.get(cust.id) || {
         customerId: cust.id,
         customerName: cust.name,
@@ -108,14 +135,14 @@ export async function GET(
         totalUnits: 0,
         totalAmount: 0,
         invoiceCount: 0,
-        lastOrderDate: item.invoice.date.toISOString(),
+        lastOrderDate: item.invoice.date ? item.invoice.date.toISOString() : new Date().toISOString(),
         salesReps: new Set<string>(),
       };
 
-      existing.totalUnits += Number(item.quantity);
-      existing.totalAmount += Number(item.amount);
+      existing.totalUnits += Number(item.quantity || 0);
+      existing.totalAmount += Number(item.amount || 0);
       existing.invoiceCount += 1;
-      if (new Date(item.invoice.date) > new Date(existing.lastOrderDate)) {
+      if (item.invoice.date && new Date(item.invoice.date) > new Date(existing.lastOrderDate)) {
         existing.lastOrderDate = item.invoice.date.toISOString();
       }
       if (item.invoice.salesRep) {
@@ -140,12 +167,12 @@ export async function GET(
       typeLabel: string;
       reference: string;
       referenceId?: string;
-      partyName: string; // Customer name or Vendor/Warehouse
+      partyName: string;
       partyContact?: string | null;
-      handledBy?: string | null; // Sales Rep / Pickup person / Staff
-      sideMark?: string | null; // Side mark notes / warehouse tags
-      shipTo?: string | null; // Delivery / pickup location
-      quantityChange: number; // + for added, - for sold
+      handledBy?: string | null;
+      sideMark?: string | null;
+      shipTo?: string | null;
+      quantityChange: number;
       unitPrice: number;
       totalAmount: number;
       notes?: string | null;
@@ -159,7 +186,7 @@ export async function GET(
       const isAddition = log.quantity > 0;
       movements.push({
         id: `log-${log.id}`,
-        date: log.createdAt.toISOString(),
+        date: log.createdAt ? log.createdAt.toISOString() : new Date().toISOString(),
         type: (log.type as any) || (isAddition ? "ADDED" : "ADJUSTMENT"),
         typeLabel:
           log.type === "INITIAL"
@@ -173,9 +200,9 @@ export async function GET(
         partyName: log.performedBy || "Warehouse / Admin",
         handledBy: log.performedBy || null,
         sideMark: log.notes || null,
-        quantityChange: log.quantity,
+        quantityChange: Number(log.quantity || 0),
         unitPrice: Number(log.unitCost ?? product.cost ?? 0),
-        totalAmount: Math.abs(log.quantity) * Number(log.unitCost ?? product.cost ?? 0),
+        totalAmount: Math.abs(Number(log.quantity || 0)) * Number(log.unitCost ?? product.cost ?? 0),
         notes: log.notes,
       });
     });
@@ -184,7 +211,7 @@ export async function GET(
     if (inventoryLogs.length === 0 && product.inventory !== null && product.inventory > 0) {
       movements.push({
         id: `init-${product.id}`,
-        date: product.createdAt.toISOString(),
+        date: product.createdAt ? product.createdAt.toISOString() : new Date().toISOString(),
         type: "INITIAL",
         typeLabel: "Initial Stock Recorded",
         reference: "Initial Setup",
@@ -199,19 +226,20 @@ export async function GET(
 
     // Add invoiced sales & pickups
     invoiceItems.forEach((item) => {
-      const qty = Number(item.quantity);
-      const rate = Number(item.rate);
-      const amount = Number(item.amount);
+      if (!item.invoice) return;
+      const qty = Number(item.quantity || 0);
+      const rate = Number(item.rate || 0);
+      const amount = Number(item.amount || 0);
 
       movements.push({
         id: `inv-item-${item.id}`,
-        date: item.invoice.date.toISOString(),
+        date: item.invoice.date ? item.invoice.date.toISOString() : new Date().toISOString(),
         type: "SOLD",
         typeLabel: "Sold / Invoiced",
-        reference: item.invoice.number,
+        reference: item.invoice.number || "Invoice",
         referenceId: item.invoice.id,
-        partyName: item.invoice.customer.name,
-        partyContact: item.invoice.customer.phone || item.invoice.customer.email || null,
+        partyName: item.invoice.customer?.name || "Customer",
+        partyContact: item.invoice.customer?.phone || item.invoice.customer?.email || null,
         handledBy: item.invoice.salesRep || null,
         sideMark: item.invoice.sideMark || null,
         shipTo: item.invoice.shipTo || null,
@@ -232,12 +260,12 @@ export async function GET(
       .reduce((sum, m) => sum + m.quantityChange, 0);
 
     const totalUnitsSold = invoiceItems.reduce(
-      (sum, item) => sum + Number(item.quantity),
+      (sum, item) => sum + Number(item.quantity || 0),
       0
     );
 
     const totalRevenue = invoiceItems.reduce(
-      (sum, item) => sum + Number(item.amount),
+      (sum, item) => sum + Number(item.amount || 0),
       0
     );
 
@@ -249,8 +277,8 @@ export async function GET(
       totalRevenue,
       totalMovementsCount: movements.length,
       customerCount: topCustomers.length,
-      unitPrice: Number(product.price),
-      unitCost: Number(product.cost),
+      unitPrice: Number(product.price || 0),
+      unitCost: Number(product.cost || 0),
       estimatedInventoryValue: (product.inventory ?? 0) * Number(product.cost || 0),
     };
 
@@ -264,10 +292,10 @@ export async function GET(
         location: product.location,
         description: product.description,
         unit: product.unit || "pcs",
-        price: Number(product.price),
-        cost: Number(product.cost),
+        price: Number(product.price || 0),
+        cost: Number(product.cost || 0),
         inventory: product.inventory,
-        createdAt: product.createdAt.toISOString(),
+        createdAt: product.createdAt ? product.createdAt.toISOString() : new Date().toISOString(),
       },
       organization: product.organization,
       summary,

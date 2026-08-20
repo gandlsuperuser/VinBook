@@ -18,7 +18,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -27,10 +27,19 @@ export async function POST(
     const body = await request.json();
     const validatedData = inventoryLogSchema.parse(body);
 
+    let organizationId = user.organizationId;
+    if (!organizationId) {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { organizationId: true },
+      });
+      organizationId = dbUser?.organizationId || "";
+    }
+
     const product = await prisma.product.findFirst({
       where: {
         id,
-        organizationId: user.organizationId,
+        ...(organizationId ? { organizationId } : {}),
       },
     });
 

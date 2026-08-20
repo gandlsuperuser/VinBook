@@ -84,21 +84,26 @@ export function ProductInventoryReportDialog({
   const [submittingStock, setSubmittingStock] = useState(false);
   const [stockError, setStockError] = useState("");
   const [stockSuccess, setStockSuccess] = useState("");
+  const [fetchError, setFetchError] = useState("");
 
   const fetchReport = async () => {
     if (!productId) return;
     setLoading(true);
+    setFetchError("");
     try {
       const params = new URLSearchParams();
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
       const res = await fetch(`/api/products/${productId}/report?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch product report");
-      const report = await res.json();
-      setData(report);
-    } catch (err) {
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Failed to fetch product report");
+      }
+      setData(result);
+    } catch (err: any) {
       console.error("Error loading product report:", err);
+      setFetchError(err.message || "Failed to load product report");
     } finally {
       setLoading(false);
     }
@@ -112,6 +117,7 @@ export function ProductInventoryReportDialog({
       setActiveTab("movements");
       setStockSuccess("");
       setStockError("");
+      setFetchError("");
     }
   }, [isOpen, productId, startDate, endDate]);
 
@@ -353,6 +359,15 @@ export function ProductInventoryReportDialog({
           <div className="py-20 flex flex-col items-center justify-center gap-2 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-sm">Loading product movement history...</p>
+          </div>
+        ) : fetchError ? (
+          <div className="py-12 flex flex-col items-center justify-center gap-3 text-center">
+            <div className="p-3 bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 rounded-lg text-sm max-w-md border border-red-200 dark:border-red-900">
+              {fetchError}
+            </div>
+            <Button size="sm" variant="outline" onClick={fetchReport} className="gap-1.5 text-xs">
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </Button>
           </div>
         ) : !data ? (
           <div className="py-12 text-center text-muted-foreground text-sm">
