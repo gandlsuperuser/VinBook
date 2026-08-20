@@ -59,6 +59,45 @@ export async function POST(request: Request) {
       },
     });
 
+    // Create 25 standard Chart of Accounts for new organization
+    const defaultAccounts = [
+      { code: "1000", name: "Cash", type: "ASSET" as const },
+      { code: "1100", name: "Accounts Receivable", type: "ASSET" as const },
+      { code: "1200", name: "Inventory", type: "ASSET" as const },
+      { code: "1300", name: "Prepaid Expenses", type: "ASSET" as const },
+      { code: "1400", name: "Property, Plant & Equipment", type: "ASSET" as const },
+      { code: "2000", name: "Accounts Payable", type: "LIABILITY" as const },
+      { code: "2100", name: "Accrued Expenses", type: "LIABILITY" as const },
+      { code: "2200", name: "Short-term Debt", type: "LIABILITY" as const },
+      { code: "2300", name: "Long-term Debt", type: "LIABILITY" as const },
+      { code: "3000", name: "Owner's Equity", type: "EQUITY" as const },
+      { code: "3100", name: "Retained Earnings", type: "EQUITY" as const },
+      { code: "4000", name: "Sales Revenue", type: "REVENUE" as const },
+      { code: "4100", name: "Service Revenue", type: "REVENUE" as const },
+      { code: "4200", name: "Other Income", type: "REVENUE" as const },
+      { code: "5000", name: "Cost of Goods Sold", type: "EXPENSE" as const },
+      { code: "6000", name: "Operating Expenses", type: "EXPENSE" as const },
+      { code: "6100", name: "Salaries & Wages", type: "EXPENSE" as const },
+      { code: "6200", name: "Rent", type: "EXPENSE" as const },
+      { code: "6300", name: "Utilities", type: "EXPENSE" as const },
+      { code: "6400", name: "Marketing & Advertising", type: "EXPENSE" as const },
+      { code: "6500", name: "Office Supplies", type: "EXPENSE" as const },
+      { code: "6600", name: "Professional Services", type: "EXPENSE" as const },
+      { code: "6700", name: "Depreciation", type: "EXPENSE" as const },
+      { code: "6800", name: "Interest Expense", type: "EXPENSE" as const },
+      { code: "6900", name: "Other Expenses", type: "EXPENSE" as const },
+    ];
+
+    await prisma.ledgerAccount.createMany({
+      data: defaultAccounts.map((acc) => ({
+        organizationId: organization.id,
+        code: acc.code,
+        name: acc.name,
+        type: acc.type,
+      })),
+      skipDuplicates: true,
+    });
+
     // Create user
     const user = await prisma.user.create({
       data: {
