@@ -100,23 +100,43 @@ const ALL_COLUMNS: ColumnDefinition[] = [
   { id: "actions", label: "Actions", defaultVisible: true, align: "right" },
 ];
 
+function formatLocalYMD(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function formatDateDisplay(dateVal: string | Date | null | undefined): string {
+  if (!dateVal) return "-";
+  if (typeof dateVal === "string") {
+    const clean = dateVal.split("T")[0];
+    const parts = clean.split("-");
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
+    }
+  }
+  const d = new Date(dateVal);
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 function getDateRangeForPreset(
   preset: string,
   customStart?: string,
   customEnd?: string
 ): { startDate?: string; endDate?: string } {
   const now = new Date();
-  const formatYMD = (d: Date) => d.toISOString().split("T")[0];
 
   switch (preset) {
     case "today": {
-      const todayStr = formatYMD(now);
+      const todayStr = formatLocalYMD(now);
       return { startDate: todayStr, endDate: todayStr };
     }
     case "yesterday": {
       const yesterday = new Date(now);
       yesterday.setDate(yesterday.getDate() - 1);
-      const str = formatYMD(yesterday);
+      const str = formatLocalYMD(yesterday);
       return { startDate: str, endDate: str };
     }
     case "this_week": {
@@ -124,7 +144,7 @@ function getDateRangeForPreset(
       const day = startOfWeek.getDay();
       const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
       startOfWeek.setDate(diff);
-      return { startDate: formatYMD(startOfWeek), endDate: formatYMD(now) };
+      return { startDate: formatLocalYMD(startOfWeek), endDate: formatLocalYMD(now) };
     }
     case "last_week": {
       const startOfLastWeek = new Date(now);
@@ -133,54 +153,54 @@ function getDateRangeForPreset(
       startOfLastWeek.setDate(diff);
       const endOfLastWeek = new Date(startOfLastWeek);
       endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
-      return { startDate: formatYMD(startOfLastWeek), endDate: formatYMD(endOfLastWeek) };
+      return { startDate: formatLocalYMD(startOfLastWeek), endDate: formatLocalYMD(endOfLastWeek) };
     }
     case "this_month": {
       const start = new Date(now.getFullYear(), now.getMonth(), 1);
       const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_month": {
       const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_30_days": {
       const start = new Date(now);
       start.setDate(start.getDate() - 30);
-      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(now) };
     }
     case "this_quarter": {
       const currentQuarter = Math.floor(now.getMonth() / 3);
       const start = new Date(now.getFullYear(), currentQuarter * 3, 1);
       const end = new Date(now.getFullYear(), currentQuarter * 3 + 3, 0);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_quarter": {
       const currentQuarter = Math.floor(now.getMonth() / 3);
       const start = new Date(now.getFullYear(), (currentQuarter - 1) * 3, 1);
       const end = new Date(now.getFullYear(), (currentQuarter - 1) * 3 + 3, 0);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_3_months": {
       const start = new Date(now);
       start.setMonth(start.getMonth() - 3);
-      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(now) };
     }
     case "this_year": {
       const start = new Date(now.getFullYear(), 0, 1);
       const end = new Date(now.getFullYear(), 11, 31);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_year": {
       const start = new Date(now.getFullYear() - 1, 0, 1);
       const end = new Date(now.getFullYear() - 1, 11, 31);
-      return { startDate: formatYMD(start), endDate: formatYMD(end) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(end) };
     }
     case "last_12_months": {
       const start = new Date(now);
       start.setMonth(start.getMonth() - 12);
-      return { startDate: formatYMD(start), endDate: formatYMD(now) };
+      return { startDate: formatLocalYMD(start), endDate: formatLocalYMD(now) };
     }
     case "custom": {
       return {
@@ -450,7 +470,7 @@ export default function InvoicesPage() {
       case "date":
         return (
           <span className="font-medium text-zinc-900 dark:text-zinc-100 whitespace-nowrap">
-            {new Date(invoice.date).toLocaleDateString()}
+            {formatDateDisplay(invoice.date)}
           </span>
         );
 
@@ -502,7 +522,7 @@ export default function InvoicesPage() {
         return isOverdue ? (
           <div className="flex flex-col">
             <span className="font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
-              {new Date(invoice.dueDate).toLocaleDateString()}
+              {formatDateDisplay(invoice.dueDate)}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
               Overdue
@@ -510,7 +530,7 @@ export default function InvoicesPage() {
           </div>
         ) : (
           <span className="text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
-            {new Date(invoice.dueDate).toLocaleDateString()}
+            {formatDateDisplay(invoice.dueDate)}
           </span>
         );
       }
