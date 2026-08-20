@@ -107,14 +107,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async jwt({ token, user, account }: any) {
+      // On initial sign-in, user object is available — persist data into the JWT
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.organizationId = user.organizationId;
       }
 
-      // Fetch fresh user data on each request
-      if (token.email) {
+      // Only do a DB lookup if the token is still missing critical fields
+      // (e.g., first OAuth login where organizationId wasn't set by authorize())
+      if (token.email && !token.organizationId) {
         try {
           let dbUser = await prisma.user.findFirst({
             where: { email: { equals: token.email, mode: "insensitive" } },
@@ -179,6 +181,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } catch (error) {
           console.error("Error fetching/creating user in JWT callback:", error);
+          // Don't break the session — return the token as-is with whatever we have
         }
       }
 
@@ -193,7 +196,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === "development",
   trustHost: true,
 });
