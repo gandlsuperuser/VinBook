@@ -28,7 +28,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Eye, Pencil, Package, Loader2, GripVertical, RotateCcw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Search, Eye, Pencil, Package, Loader2, GripVertical, RotateCcw, Settings } from "lucide-react";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { InvoiceStatus } from "@prisma/client";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
@@ -58,22 +66,38 @@ interface InvoiceSummary {
   overdueAmount: number;
 }
 
-export type ColumnId = "date" | "number" | "customer" | "sideMark" | "status" | "amount" | "actions";
+export type ColumnId =
+  | "date"
+  | "number"
+  | "customer"
+  | "sideMark"
+  | "status"
+  | "amount"
+  | "dueDate"
+  | "poNumber"
+  | "salesRep"
+  | "balance"
+  | "actions";
 
-interface ColumnConfig {
+interface ColumnDefinition {
   id: ColumnId;
   label: string;
+  defaultVisible: boolean;
   align?: "left" | "right";
 }
 
-const DEFAULT_COLUMNS: ColumnConfig[] = [
-  { id: "date", label: "Date", align: "left" },
-  { id: "number", label: "Invoice #", align: "left" },
-  { id: "customer", label: "Customer", align: "left" },
-  { id: "sideMark", label: "Side Mark", align: "left" },
-  { id: "status", label: "Status", align: "left" },
-  { id: "amount", label: "Amount", align: "right" },
-  { id: "actions", label: "Actions", align: "right" },
+const ALL_COLUMNS: ColumnDefinition[] = [
+  { id: "date", label: "Date", defaultVisible: true, align: "left" },
+  { id: "number", label: "Invoice #", defaultVisible: true, align: "left" },
+  { id: "customer", label: "Customer", defaultVisible: true, align: "left" },
+  { id: "sideMark", label: "Side Mark", defaultVisible: true, align: "left" },
+  { id: "status", label: "Status", defaultVisible: true, align: "left" },
+  { id: "amount", label: "Amount", defaultVisible: true, align: "right" },
+  { id: "dueDate", label: "Due Date", defaultVisible: false, align: "left" },
+  { id: "poNumber", label: "PO Number", defaultVisible: false, align: "left" },
+  { id: "salesRep", label: "Sales Rep", defaultVisible: false, align: "left" },
+  { id: "balance", label: "Balance Due", defaultVisible: false, align: "right" },
+  { id: "actions", label: "Actions", defaultVisible: true, align: "right" },
 ];
 
 function getDateRangeForPreset(
@@ -193,34 +217,68 @@ export default function InvoicesPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [generatingPackingListId, setGeneratingPackingListId] = useState<string | null>(null);
 
-  // Dynamic movable columns state
-  const [columns, setColumns] = useState<ColumnConfig[]>(DEFAULT_COLUMNS);
+  // Dynamic movable and customizable columns state
+  const [columnOrder, setColumnOrder] = useState<ColumnId[]>(() =>
+    ALL_COLUMNS.map((c) => c.id)
+  );
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnId>>(
+    () => new Set(ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.id))
+  );
   const [draggedColIndex, setDraggedColIndex] = useState<number | null>(null);
   const [dragOverColIndex, setDragOverColIndex] = useState<number | null>(null);
 
+  // Load configuration from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("vinbook_invoices_column_order");
+      const saved = localStorage.getItem("vinbook_invoices_columns_config_v2");
       if (saved) {
-        const orderIds: string[] = JSON.parse(saved);
-        const reordered: ColumnConfig[] = [];
-        orderIds.forEach((id) => {
-          const col = DEFAULT_COLUMNS.find((c) => c.id === id);
-          if (col) reordered.push(col);
-        });
-        DEFAULT_COLUMNS.forEach((col) => {
-          if (!reordered.some((c) => c.id === col.id)) {
-            reordered.push(col);
-          }
-        });
-        if (reordered.length === DEFAULT_COLUMNS.length) {
-          setColumns(reordered);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.order) && Array.isArray(parsed.visible)) {
+          const mergedOrder: ColumnId[] = [];
+          parsed.order.forEach((id: ColumnId) => {
+            if (ALL_COLUMNS.some((c) => c.id === id)) mergedOrder.push(id);
+          });
+          ALL_COLUMNS.forEach((c) => {
+            if (!mergedOrder.includes(c.id)) mergedOrder.push(c.id);
+          });
+
+          setColumnOrder(mergedOrder);
+          setVisibleColumns(new Set(parsed.visible));
         }
       }
     } catch {
-      // fallback to DEFAULT_COLUMNS
+      // fallback
     }
   }, []);
+
+  const saveConfig = (order: ColumnId[], visible: Set<ColumnId>) => {
+    try {
+      localStorage.setItem(
+        "vinbook_invoices_columns_config_v2",
+        JSON.stringify({
+          order,
+          visible: Array.from(visible),
+        })
+      );
+    } catch {}
+  };
+
+  const toggleColumn = (id: ColumnId) => {
+    const next = new Set(visibleColumns);
+    if (next.has(id)) {
+      if (next.size <= 1) return; // keep at least 1 column
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setVisibleColumns(next);
+    saveConfig(columnOrder, next);
+  };
+
+  // Active displayed columns in current order
+  const displayedColumns = columnOrder
+    .filter((id) => visibleColumns.has(id))
+    .map((id) => ALL_COLUMNS.find((c) => c.id === id)!);
 
   const handleColumnDrop = (targetIndex: number) => {
     if (draggedColIndex === null || draggedColIndex === targetIndex) {
@@ -228,28 +286,44 @@ export default function InvoicesPage() {
       setDragOverColIndex(null);
       return;
     }
-    const newCols = [...columns];
-    const [dragged] = newCols.splice(draggedColIndex, 1);
-    newCols.splice(targetIndex, 0, dragged);
-    setColumns(newCols);
-    try {
-      localStorage.setItem(
-        "vinbook_invoices_column_order",
-        JSON.stringify(newCols.map((c) => c.id))
-      );
-    } catch {}
+    const fromColId = displayedColumns[draggedColIndex]?.id;
+    const toColId = displayedColumns[targetIndex]?.id;
+
+    if (!fromColId || !toColId) {
+      setDraggedColIndex(null);
+      setDragOverColIndex(null);
+      return;
+    }
+
+    const newOrder = [...columnOrder];
+    const oldPos = newOrder.indexOf(fromColId);
+    const newPos = newOrder.indexOf(toColId);
+
+    if (oldPos !== -1 && newPos !== -1) {
+      const [moved] = newOrder.splice(oldPos, 1);
+      newOrder.splice(newPos, 0, moved);
+      setColumnOrder(newOrder);
+      saveConfig(newOrder, visibleColumns);
+    }
+
     setDraggedColIndex(null);
     setDragOverColIndex(null);
   };
 
   const handleResetColumns = () => {
-    setColumns(DEFAULT_COLUMNS);
+    const defaultOrder = ALL_COLUMNS.map((c) => c.id);
+    const defaultVis = new Set(ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.id));
+    setColumnOrder(defaultOrder);
+    setVisibleColumns(defaultVis);
     try {
-      localStorage.removeItem("vinbook_invoices_column_order");
+      localStorage.removeItem("vinbook_invoices_columns_config_v2");
     } catch {}
   };
 
-  const isCustomColumnOrder = JSON.stringify(columns.map((c) => c.id)) !== JSON.stringify(DEFAULT_COLUMNS.map((c) => c.id));
+  const isCustomConfig =
+    JSON.stringify(columnOrder) !== JSON.stringify(ALL_COLUMNS.map((c) => c.id)) ||
+    visibleColumns.size !== ALL_COLUMNS.filter((c) => c.defaultVisible).length ||
+    !ALL_COLUMNS.filter((c) => c.defaultVisible).every((c) => visibleColumns.has(c.id));
 
   const handleDownloadPackingList = async (invoiceId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -389,7 +463,7 @@ export default function InvoicesPage() {
             >
               {invoice.number}
             </Link>
-            {invoice.poNumber && (
+            {invoice.poNumber && !visibleColumns.has("poNumber") && (
               <div className="text-xs text-muted-foreground font-mono">
                 PO: {invoice.poNumber}
               </div>
@@ -401,7 +475,7 @@ export default function InvoicesPage() {
         return (
           <div>
             <div className="font-medium text-zinc-900 dark:text-zinc-100">{invoice.customer.name}</div>
-            {invoice.salesRep && (
+            {invoice.salesRep && !visibleColumns.has("salesRep") && (
               <div className="text-xs text-muted-foreground">
                 Rep: {invoice.salesRep}
               </div>
@@ -421,6 +495,44 @@ export default function InvoicesPage() {
           <span className="text-muted-foreground text-xs">-</span>
         );
 
+      case "dueDate": {
+        const isOverdue =
+          invoice.status !== InvoiceStatus.PAID &&
+          new Date(invoice.dueDate) < new Date();
+        return isOverdue ? (
+          <div className="flex flex-col">
+            <span className="font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
+              {new Date(invoice.dueDate).toLocaleDateString()}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 dark:text-red-400">
+              Overdue
+            </span>
+          </div>
+        ) : (
+          <span className="text-zinc-700 dark:text-zinc-300 whitespace-nowrap">
+            {new Date(invoice.dueDate).toLocaleDateString()}
+          </span>
+        );
+      }
+
+      case "poNumber":
+        return invoice.poNumber ? (
+          <span className="font-mono text-xs font-medium text-zinc-800 dark:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded">
+            {invoice.poNumber}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">-</span>
+        );
+
+      case "salesRep":
+        return invoice.salesRep ? (
+          <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+            {invoice.salesRep}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">-</span>
+        );
+
       case "status":
         return (
           <span
@@ -436,15 +548,32 @@ export default function InvoicesPage() {
         return (
           <div>
             <div className="font-semibold text-zinc-900 dark:text-zinc-50">
-              ${Number(invoice.total).toLocaleString()}
+              ${Number(invoice.total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             {paidAmount > 0 && (
               <div className="text-xs text-muted-foreground">
-                Paid: ${paidAmount.toLocaleString()}
+                Paid: ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             )}
           </div>
         );
+
+      case "balance": {
+        const balance = Math.max(0, Number(invoice.total) - paidAmount);
+        return (
+          <div className="text-right">
+            <span
+              className={`font-semibold ${
+                balance > 0
+                  ? "text-amber-700 dark:text-amber-400"
+                  : "text-emerald-600 dark:text-emerald-400"
+              }`}
+            >
+              ${balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        );
+      }
 
       case "actions":
         return (
@@ -561,7 +690,7 @@ export default function InvoicesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Filter Bar with Date Filter just like the reference photo */}
+      {/* Filter Bar with Date Filter & Gear Column Customizer */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -659,27 +788,77 @@ export default function InvoicesPage() {
           </Select>
         </div>
 
-        {/* Reset columns order button if moved */}
-        {isCustomColumnOrder && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleResetColumns}
-            className="text-xs gap-1 text-muted-foreground hover:text-foreground"
-            title="Reset column order to default"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset Columns
-          </Button>
-        )}
+        {/* Right side controls: Reset and Gear Icon */}
+        <div className="flex items-center gap-2">
+          {isCustomConfig && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleResetColumns}
+              className="text-xs gap-1 text-muted-foreground hover:text-foreground"
+              title="Reset column order and visibility to default"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset Columns
+            </Button>
+          )}
+
+          {/* Small Gear Icon Dropdown to Add / Remove Columns */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 bg-white dark:bg-zinc-900 border text-muted-foreground hover:text-foreground hover:border-zinc-400 transition-colors shrink-0 shadow-sm"
+                title="Add or remove columns"
+              >
+                <Settings className="h-4 w-4" />
+                <span className="sr-only">Customize Columns</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 p-2 bg-white dark:bg-zinc-950 shadow-xl border rounded-lg">
+              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Add / Remove Columns
+              </div>
+              <DropdownMenuSeparator />
+              <div className="max-h-[320px] overflow-y-auto space-y-0.5 py-1">
+                {ALL_COLUMNS.map((col) => {
+                  const isChecked = visibleColumns.has(col.id);
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={isChecked}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        toggleColumn(col.id);
+                      }}
+                      className="cursor-pointer text-sm font-medium py-1.5"
+                    >
+                      {col.label}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+              </div>
+              <DropdownMenuSeparator />
+              <button
+                type="button"
+                onClick={handleResetColumns}
+                className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-900 rounded p-1.5 transition-colors mt-1"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Reset to Default
+              </button>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
-              {columns.map((col, idx) => {
+              {displayedColumns.map((col, idx) => {
                 const isDragging = draggedColIndex === idx;
                 const isDragOver = dragOverColIndex === idx && draggedColIndex !== idx;
 
@@ -733,13 +912,13 @@ export default function InvoicesPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8">
+                <TableCell colSpan={displayedColumns.length} className="text-center py-8">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : invoices.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={displayedColumns.length} className="text-center py-8 text-muted-foreground">
                   No invoices found
                 </TableCell>
               </TableRow>
@@ -747,7 +926,7 @@ export default function InvoicesPage() {
               invoices.map((invoice) => {
                 return (
                   <TableRow key={invoice.id}>
-                    {columns.map((col) => (
+                    {displayedColumns.map((col) => (
                       <TableCell
                         key={col.id}
                         className={col.align === "right" ? "text-right" : "text-left"}
