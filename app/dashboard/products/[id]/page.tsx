@@ -19,9 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Package, DollarSign, FileText } from "lucide-react";
+import { ArrowLeft, Pencil, Package, DollarSign, FileText, PackagePlus } from "lucide-react";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductInventoryReportDialog } from "@/components/products/product-inventory-report-dialog";
+import { QuickAdjustInventoryDialog } from "@/components/products/quick-adjust-inventory-dialog";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +68,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
 
   useEffect(() => {
     fetchProduct();
@@ -124,19 +126,21 @@ export default function ProductDetailPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
+            onClick={() => setIsAdjustOpen(true)}
+            className="text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20 hover:bg-emerald-100"
+            title="Quickly adjust or restock inventory"
+          >
+            <PackagePlus className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            Adjust Inventory
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setIsReportOpen(true)}
             className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
             title="Run Product Inventory & Movement Report"
           >
             <FileText className="mr-2 h-4 w-4" />
             Movement Report
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsEditDialogOpen(true)}
-          >
-            <Package className="mr-2 h-4 w-4" />
-            Inventory
           </Button>
           <Button onClick={() => setIsEditDialogOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" />
@@ -322,6 +326,14 @@ export default function ProductDetailPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Quick Adjust Inventory Dialog */}
+      <QuickAdjustInventoryDialog
+        product={product}
+        isOpen={isAdjustOpen}
+        onClose={() => setIsAdjustOpen(false)}
+        onSuccess={fetchProduct}
+      />
 
       {/* Product Inventory Movement Report Dialog */}
       <ProductInventoryReportDialog

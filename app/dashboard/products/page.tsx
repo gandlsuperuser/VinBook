@@ -27,9 +27,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, Trash2, Eye, FileText } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, FileText, MoreHorizontal, PackagePlus } from "lucide-react";
 import { ProductForm } from "@/components/products/product-form";
 import { ProductInventoryReportDialog } from "@/components/products/product-inventory-report-dialog";
+import { QuickAdjustInventoryDialog } from "@/components/products/quick-adjust-inventory-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProductType } from "@prisma/client";
 
 interface Product {
@@ -59,6 +67,8 @@ export default function ProductsPage() {
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedProductForReport, setSelectedProductForReport] = useState<Product | null>(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [selectedProductForAdjust, setSelectedProductForAdjust] = useState<Product | null>(null);
+  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -280,44 +290,66 @@ export default function ProductsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setSelectedProductForReport(product);
-                          setIsReportOpen(true);
-                        }}
-                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
-                        title="Run Product Inventory & Movement Report"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild title="View Details">
-                        <Link href={`/dashboard/products/${product.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Edit Product"
-                        onClick={() => {
-                          setEditingProduct(product);
-                          setIsDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Delete Product"
-                        onClick={() => handleDelete(product.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                          title="Product Actions"
+                        >
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52 p-1 bg-white dark:bg-zinc-950 shadow-xl border rounded-lg">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedProductForAdjust(product);
+                            setIsAdjustOpen(true);
+                          }}
+                          className="cursor-pointer text-emerald-700 dark:text-emerald-400 font-medium hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                        >
+                          <PackagePlus className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                          Adjust Inventory
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelectedProductForReport(product);
+                            setIsReportOpen(true);
+                          }}
+                          className="cursor-pointer text-indigo-700 dark:text-indigo-400 font-medium hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+                        >
+                          <FileText className="mr-2 h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                          Movement Report
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <Link href={`/dashboard/products/${product.id}`}>
+                            <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
+                            View Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingProduct(product);
+                            setIsDialogOpen(true);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Pencil className="mr-2 h-4 w-4 text-muted-foreground" />
+                          Edit Product
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(product.id)}
+                          className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
@@ -347,6 +379,17 @@ export default function ProductsPage() {
           </Button>
         </div>
       )}
+
+      {/* Quick Adjust Inventory Dialog */}
+      <QuickAdjustInventoryDialog
+        product={selectedProductForAdjust}
+        isOpen={isAdjustOpen}
+        onClose={() => {
+          setIsAdjustOpen(false);
+          setSelectedProductForAdjust(null);
+        }}
+        onSuccess={fetchProducts}
+      />
 
       {/* Product Inventory Movement Report Dialog */}
       <ProductInventoryReportDialog
