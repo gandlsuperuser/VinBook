@@ -27,8 +27,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Search, Pencil, Trash2, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Eye, FileText } from "lucide-react";
 import { ProductForm } from "@/components/products/product-form";
+import { ProductInventoryReportDialog } from "@/components/products/product-inventory-report-dialog";
 import { ProductType } from "@prisma/client";
 
 interface Product {
@@ -56,6 +57,8 @@ export default function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [selectedProductForReport, setSelectedProductForReport] = useState<Product | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -277,8 +280,20 @@ export default function ProductsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="ghost" size="icon" asChild>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          setSelectedProductForReport(product);
+                          setIsReportOpen(true);
+                        }}
+                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+                        title="Run Product Inventory & Movement Report"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" asChild title="View Details">
                         <Link href={`/dashboard/products/${product.id}`}>
                           <Eye className="h-4 w-4" />
                         </Link>
@@ -286,6 +301,7 @@ export default function ProductsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Edit Product"
                         onClick={() => {
                           setEditingProduct(product);
                           setIsDialogOpen(true);
@@ -296,6 +312,7 @@ export default function ProductsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
+                        title="Delete Product"
                         onClick={() => handleDelete(product.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -330,6 +347,18 @@ export default function ProductsPage() {
           </Button>
         </div>
       )}
+
+      {/* Product Inventory Movement Report Dialog */}
+      <ProductInventoryReportDialog
+        productId={selectedProductForReport?.id || null}
+        productName={selectedProductForReport?.name}
+        isOpen={isReportOpen}
+        onClose={() => {
+          setIsReportOpen(false);
+          setSelectedProductForReport(null);
+        }}
+        onInventoryUpdated={fetchProducts}
+      />
     </div>
   );
 }

@@ -108,6 +108,9 @@ export async function PUT(
       );
     }
 
+    const prevInventory = existingProduct.inventory;
+    const newInventory = validatedData.inventory;
+
     const product = await prisma.product.update({
       where: { id: id },
       data: {
@@ -124,6 +127,28 @@ export async function PUT(
         isActive: validatedData.isActive ?? true,
       },
     });
+
+    if (newInventory !== undefined && newInventory !== null && newInventory !== prevInventory) {
+      const diff = newInventory - (prevInventory || 0);
+      try {
+        await prisma.inventoryLog.create({
+          data: {
+            organizationId: user.organizationId,
+            productId: id,
+            type: diff > 0 ? "ADDED" : "ADJUSTMENT",
+            quantity: diff,
+            previousStock: prevInventory,
+            newStock: newInventory,
+            unitCost: validatedData.cost || existingProduct.cost || 0,
+            reference: diff > 0 ? "Stock Addition / Adjustment" : "Stock Reduction / Adjustment",
+            notes: `Inventory adjusted from ${prevInventory || 0} to ${newInventory}`,
+            performedBy: user.name || user.email || "System",
+          },
+        });
+      } catch (logErr) {
+        console.error("Error logging inventory change:", logErr);
+      }
+    }
 
     return NextResponse.json(product);
   } catch (error) {

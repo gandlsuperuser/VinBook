@@ -19,8 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Package, DollarSign } from "lucide-react";
+import { ArrowLeft, Pencil, Package, DollarSign, FileText } from "lucide-react";
 import { ProductForm } from "@/components/products/product-form";
+import { ProductInventoryReportDialog } from "@/components/products/product-inventory-report-dialog";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +66,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   useEffect(() => {
     fetchProduct();
@@ -120,6 +122,15 @@ export default function ProductDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsReportOpen(true)}
+            className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50"
+            title="Run Product Inventory & Movement Report"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Movement Report
+          </Button>
           <Button
             variant="outline"
             onClick={() => setIsEditDialogOpen(true)}
@@ -311,6 +322,15 @@ export default function ProductDetailPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Product Inventory Movement Report Dialog */}
+      <ProductInventoryReportDialog
+        productId={product.id}
+        productName={product.name}
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        onInventoryUpdated={fetchProduct}
+      />
     </div>
   );
 }

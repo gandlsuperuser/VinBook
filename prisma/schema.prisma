@@ -98,6 +98,7 @@ model Organization {
   ledgerAccounts LedgerAccount[]
   ledgerEntries LedgerEntry[]
   bankAccounts BankAccount[]
+  inventoryLogs InventoryLog[]
   subscription Subscription?
   settingsRecord Settings?
 
@@ -171,10 +172,33 @@ model Product {
 
   invoiceItems  InvoiceItem[]
   estimateItems EstimateItem[]
+  inventoryLogs InventoryLog[]
 
   @@index([organizationId])
   @@index([sku])
   @@index([type])
+}
+
+// Inventory Log / Movement model for full audit trail
+model InventoryLog {
+  id            String       @id @default(cuid())
+  organizationId String
+  organization  Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  productId     String
+  product       Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type          String       @default("ADDED") // ADDED, RESTOCK, ADJUSTMENT, INITIAL, PICKUP, SOLD
+  quantity      Int          // Quantity change (+ or -)
+  previousStock Int?
+  newStock      Int?
+  unitCost      Decimal?     @db.Decimal(10, 2)
+  reference     String?      // e.g. PO #, Restock Batch, Delivery note
+  notes         String?      @db.Text
+  performedBy   String?      // Staff / Vendor / Customer
+  createdAt     DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([productId])
+  @@index([createdAt])
 }
 
 enum ProductType {

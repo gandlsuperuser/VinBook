@@ -109,6 +109,27 @@ export async function POST(request: Request) {
       },
     });
 
+    if (validatedData.inventory && validatedData.inventory > 0) {
+      try {
+        await prisma.inventoryLog.create({
+          data: {
+            organizationId: user.organizationId,
+            productId: product.id,
+            type: "INITIAL",
+            quantity: validatedData.inventory,
+            previousStock: 0,
+            newStock: validatedData.inventory,
+            unitCost: validatedData.cost || 0,
+            reference: "Initial Stock Setup",
+            notes: "Initial inventory setup on product creation",
+            performedBy: user.name || user.email || "System",
+          },
+        });
+      } catch (logErr) {
+        console.error("Error creating initial inventory log:", logErr);
+      }
+    }
+
     return NextResponse.json(product, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
