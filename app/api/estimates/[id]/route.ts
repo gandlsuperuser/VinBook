@@ -101,11 +101,15 @@ export async function PUT(
       organizationId = dbUser?.organizationId || "";
     }
 
+    if (!organizationId) {
+      return NextResponse.json({ error: "User organization not found" }, { status: 400 });
+    }
+
     // Check if estimate exists
     const existingEstimate = await prisma.estimate.findFirst({
       where: {
         id: id,
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
       },
     });
 

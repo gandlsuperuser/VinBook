@@ -40,15 +40,41 @@ export async function POST(request: Request) {
 
     // Auto-heal organization if missing
     let organizationId = user.organizationId;
+    let organizationName = user.organization?.name;
+
     if (!organizationId) {
-      const defaultOrg = await prisma.organization.findFirst();
-      if (defaultOrg) {
-        organizationId = defaultOrg.id;
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { organizationId: defaultOrg.id },
-        });
-      }
+      const userName = user.name || user.email.split("@")[0] || "User";
+      const slug =
+        userName
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "") + `-${Date.now()}`;
+
+      const newOrg = await prisma.organization.create({
+        data: {
+          name: `${userName}'s Company`,
+          slug,
+        },
+      });
+
+      await prisma.settings.create({
+        data: {
+          organizationId: newOrg.id,
+          taxSettings: { defaultTaxRate: 0, taxInclusive: false },
+          invoiceSettings: { prefix: "INV", numberFormat: "00000", defaultTerms: "Net 30" },
+          currency: "USD",
+          timezone: "UTC",
+          fiscalYearStart: "01-01",
+        },
+      });
+
+      organizationId = newOrg.id;
+      organizationName = newOrg.name;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { organizationId: newOrg.id },
+      });
     }
 
     const payload = {
@@ -65,7 +91,7 @@ export async function POST(request: Request) {
     const response = NextResponse.json({
       success: true,
       user: payload,
-      organization: user.organization?.name || "Default Organization",
+      organization: organizationName || "My Company",
     });
 
     // Set secure HTTP-only cookie

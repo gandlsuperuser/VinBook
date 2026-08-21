@@ -105,18 +105,61 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
           if (!dbUser) {
-            let org = await prisma.organization.findFirst();
-            if (!org) {
-              const slug = (token.name || token.email.split("@")[0])
+            const userName = token.name || token.email.split("@")[0] || "User";
+            const slug =
+              userName
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, "-")
                 .replace(/^-|-$/g, "") + "-" + Date.now();
-              org = await prisma.organization.create({
+
+            const org = await prisma.organization.create({
+              data: {
+                name: `${userName}'s Company`,
+                slug,
+              },
+            });
+
+            await prisma.settings.create({
+              data: {
+                organizationId: org.id,
+                taxSettings: { defaultTaxRate: 0, taxInclusive: false },
+                invoiceSettings: { prefix: "INV", numberFormat: "00000", defaultTerms: "Net 30" },
+                currency: "USD",
+                timezone: "UTC",
+                fiscalYearStart: "01-01",
+              },
+            });
+
+            const newUser = await prisma.user.create({
+              data: {
+                email: token.email.toLowerCase(),
+                name: userName,
+                image: token.picture || null,
+                role: "ADMIN",
+                organizationId: org.id,
+              },
+            });
+
+            token.id = newUser.id;
+            token.role = newUser.role;
+            token.organizationId = newUser.organizationId;
+          } else {
+            let orgId = dbUser.organizationId;
+            if (!orgId) {
+              const userName = dbUser.name || dbUser.email.split("@")[0] || "User";
+              const slug =
+                userName
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, "-")
+                  .replace(/^-|-$/g, "") + "-" + Date.now();
+
+              const org = await prisma.organization.create({
                 data: {
-                  name: `${token.name || "User"}'s Organization`,
+                  name: `${userName}'s Company`,
                   slug,
                 },
               });
+
               await prisma.settings.create({
                 data: {
                   organizationId: org.id,
@@ -127,30 +170,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                   fiscalYearStart: "01-01",
                 },
               });
-            }
-            const newUser = await prisma.user.create({
-              data: {
-                email: token.email.toLowerCase(),
-                name: token.name || token.email.split("@")[0],
-                image: token.picture || null,
-                role: "ADMIN",
-                organizationId: org.id,
-              },
-            });
-            token.id = newUser.id;
-            token.role = newUser.role;
-            token.organizationId = newUser.organizationId;
-          } else {
-            let orgId = dbUser.organizationId;
-            if (!orgId) {
-              const firstOrg = await prisma.organization.findFirst();
-              if (firstOrg) {
-                orgId = firstOrg.id;
-                await prisma.user.update({
-                  where: { id: dbUser.id },
-                  data: { organizationId: firstOrg.id },
-                });
-              }
+
+              orgId = org.id;
+              await prisma.user.update({
+                where: { id: dbUser.id },
+                data: { organizationId: org.id },
+              });
             }
             token.id = dbUser.id;
             token.role = dbUser.role;

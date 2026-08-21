@@ -15,6 +15,7 @@ import {
 import { X, Plus, Trash2 } from "lucide-react";
 import { EstimateStatus } from "@prisma/client";
 import { useLanguage } from "@/components/providers/language-context";
+import { LineItemAutocomplete } from "@/components/ui/line-item-autocomplete";
 
 interface EstimateItem {
   id?: string;
@@ -154,6 +155,28 @@ export function EstimateForm({
     }
 
     newItems[index] = item;
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleSelectProduct = (index: number, product: any) => {
+    const newItems = [...formData.items];
+    const item = { ...newItems[index] };
+    const price = Number(product.price) || 0;
+    const qty = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+
+    item.productId = product.id;
+    item.description = product.name;
+    item.rate = price;
+    item.quantity = qty;
+    item.amount = calculateItemAmount(qty, price);
+
+    newItems[index] = item;
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleClearProduct = (index: number) => {
+    const newItems = [...formData.items];
+    newItems[index] = { ...newItems[index], productId: undefined };
     setFormData({ ...formData, items: newItems });
   };
 
@@ -391,40 +414,23 @@ export function EstimateForm({
         </div>
         <div className="border rounded-lg">
           <div className="grid grid-cols-12 gap-2 p-2 bg-muted font-medium text-sm">
-            <div className="col-span-4">{t("invoices.itemSku")} / {t("common.description")}</div>
+            <div className="col-span-5">{t("invoices.itemSku")} / {t("common.description")}</div>
             <div className="col-span-2">{t("common.quantity")}</div>
             <div className="col-span-2">{t("common.rate")}</div>
             <div className="col-span-2">{t("common.amount")}</div>
-            <div className="col-span-2"></div>
+            <div className="col-span-1"></div>
           </div>
           {formData.items.map((item, index) => (
-            <div key={index} className="grid grid-cols-12 gap-2 p-2 border-t">
-              <div className="col-span-4">
-                <Select
-                  value={item.productId || "custom"}
-                  onValueChange={(value) =>
-                    handleItemChange(index, "productId", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("invoices.addCustomItem")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="custom">{t("invoices.addCustomItem")}</SelectItem>
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  className="mt-2"
-                  placeholder={t("common.description")}
+            <div key={index} className="grid grid-cols-12 gap-2 p-2 border-t items-start">
+              <div className="col-span-5">
+                <LineItemAutocomplete
                   value={item.description}
-                  onChange={(e) =>
-                    handleItemChange(index, "description", e.target.value)
-                  }
+                  productId={item.productId}
+                  products={products}
+                  placeholder="Search item by name, SKU or type custom..."
+                  onChange={(desc) => handleItemChange(index, "description", desc)}
+                  onSelectProduct={(product) => handleSelectProduct(index, product)}
+                  onClearProduct={() => handleClearProduct(index)}
                   required
                 />
               </div>
@@ -452,10 +458,10 @@ export function EstimateForm({
                   required
                 />
               </div>
-              <div className="col-span-2 flex items-center font-medium">
-                ${item.amount.toFixed(2)}
+              <div className="col-span-2 flex items-center font-medium pt-2">
+                ${Number(item.amount).toFixed(2)}
               </div>
-              <div className="col-span-2 flex items-center justify-end">
+              <div className="col-span-1 flex items-center justify-end pt-1">
                 <Button
                   type="button"
                   variant="ghost"
@@ -464,7 +470,7 @@ export function EstimateForm({
                   disabled={formData.items.length === 1}
                   className="cursor-pointer"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                 </Button>
               </div>
             </div>

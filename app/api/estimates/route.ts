@@ -58,8 +58,12 @@ export async function GET(request: Request) {
     const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
+    if (!organizationId) {
+      return NextResponse.json({ error: "User organization not found" }, { status: 400 });
+    }
+
     const where: any = {
-      ...(organizationId ? { organizationId } : {}),
+      organizationId,
     };
 
     if (search) {
@@ -186,15 +190,14 @@ export async function POST(request: Request) {
     }
 
     if (!organizationId) {
-      const firstOrg = await prisma.organization.findFirst();
-      organizationId = firstOrg?.id || "";
+      return NextResponse.json({ error: "User organization not found" }, { status: 400 });
     }
 
     // Check customer
     const customer = await prisma.customer.findFirst({
       where: {
         id: validatedData.customerId,
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
       },
     });
 

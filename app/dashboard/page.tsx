@@ -73,8 +73,11 @@ export default async function DashboardPage() {
 
   let orgId = user.organizationId;
   if (!orgId) {
-    const firstOrg = await prisma.organization.findFirst();
-    orgId = firstOrg?.id || "";
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { organizationId: true },
+    });
+    orgId = dbUser?.organizationId || "";
   }
   const now = new Date();
   const thirtyDaysFromNow = addDays(now, 30);

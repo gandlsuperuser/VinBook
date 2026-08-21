@@ -36,10 +36,14 @@ export async function POST(
       organizationId = dbUser?.organizationId || "";
     }
 
+    if (!organizationId) {
+      return NextResponse.json({ error: "User organization not found" }, { status: 400 });
+    }
+
     const product = await prisma.product.findFirst({
       where: {
         id,
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
       },
     });
 
