@@ -133,55 +133,31 @@ export async function downloadPackingListPDF(invoice: any) {
         </div>
       ` : ""}
 
-      <!-- Summary Packaging KPI Banner -->
-      <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-        <div style="flex: 1; background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 6px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #1e40af;">Total Boxes / CTN:</span>
-          <span style="font-size: 16px; font-weight: 800; color: #1d4ed8;">${totalBoxesCount > 0 ? `${totalBoxesCount} Boxes` : `${processedItems.length} Items`}</span>
-        </div>
-        <div style="flex: 1; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 6px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between;">
-          <span style="font-size: 11px; font-weight: bold; text-transform: uppercase; color: #166534;">Total Quantity:</span>
-          <span style="font-size: 16px; font-weight: 800; color: #15803d;">${totalSqftCount.toLocaleString()} ${hasFlooringItems ? "sqft" : "units"}</span>
-        </div>
-      </div>
-
       <!-- Packing Items Table -->
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
         <thead>
           <tr style="background: #111827; color: #ffffff;">
-            <th style="text-align: left; padding: 9px 10px; font-weight: 700; font-size: 11px; width: 85px; border-radius: 4px 0 0 0;">SKU / Code</th>
-            <th style="text-align: left; padding: 9px 10px; font-weight: 700; font-size: 11px;">Item Description</th>
-            <th style="text-align: center; padding: 9px 8px; font-weight: 700; font-size: 11px; width: 90px;">Sqft / Box</th>
-            <th style="text-align: center; padding: 9px 10px; font-weight: 800; font-size: 12px; width: 95px; background: #1e3a8a; color: #ffffff;">Boxes</th>
-            <th style="text-align: right; padding: 9px 10px; font-weight: 700; font-size: 11px; width: 100px;">Total Qty</th>
-            <th style="text-align: center; padding: 9px 8px; font-weight: 700; font-size: 11px; width: 65px; border-radius: 0 4px 0 0;">Checked</th>
+            <th style="text-align: left; padding: 10px 12px; font-weight: 700; font-size: 11px; width: 120px; border-radius: 4px 0 0 0;">SKU / Code</th>
+            <th style="text-align: left; padding: 10px 12px; font-weight: 700; font-size: 11px;">Item Description</th>
+            <th style="text-align: right; padding: 10px 12px; font-weight: 700; font-size: 11px; width: 130px;">Total Quantity</th>
+            <th style="text-align: center; padding: 10px 8px; font-weight: 700; font-size: 11px; width: 70px; border-radius: 0 4px 0 0;">Checked</th>
           </tr>
         </thead>
         <tbody>
-          ${processedItems
+          ${(invoice.items || [])
             .map(
               (item: any, idx: number) => `
             <tr style="border-bottom: 1px solid #e5e7eb; background: ${idx % 2 === 0 ? "#ffffff" : "#f9fafb"};">
-              <td style="padding: 9px 10px; font-weight: 600; font-size: 12px; vertical-align: middle; font-family: monospace;">
+              <td style="padding: 10px 12px; font-weight: 600; font-size: 12px; vertical-align: middle; font-family: monospace;">
                 ${item.product?.sku || "-"}
               </td>
-              <td style="padding: 9px 10px; vertical-align: middle;">
+              <td style="padding: 10px 12px; vertical-align: middle;">
                 <div style="font-weight: 600; font-size: 12px; color: #111;">${item.description}</div>
               </td>
-              <td style="text-align: center; padding: 9px 8px; font-size: 11px; color: #4b5563; vertical-align: middle;">
-                ${item.sqftPerBox ? `${item.sqftPerBox} sf/bx` : "-"}
+              <td style="text-align: right; padding: 10px 12px; font-weight: 700; font-size: 13px; color: #111; vertical-align: middle;">
+                ${Number(item.quantity || 0).toLocaleString()}
               </td>
-              <td style="text-align: center; padding: 9px 10px; vertical-align: middle; background: ${item.boxes ? "#eff6ff" : "transparent"};">
-                ${
-                  item.boxes !== null
-                    ? `<span style="font-weight: 800; font-size: 14px; color: #1e40af;">${item.boxes} <span style="font-size: 11px; font-weight: 600;">${item.boxes === 1 ? "Bx" : "Bxs"}</span></span>`
-                    : `<span style="color: #9ca3af; font-size: 11px;">-</span>`
-                }
-              </td>
-              <td style="text-align: right; padding: 9px 10px; font-weight: 700; font-size: 12px; color: #111; vertical-align: middle;">
-                ${Number(item.lineSqft || item.quantity || 0).toLocaleString()} ${item.sqftPerBox ? "sqft" : item.unit}
-              </td>
-              <td style="text-align: center; padding: 9px 8px; vertical-align: middle;">
+              <td style="text-align: center; padding: 10px 8px; vertical-align: middle;">
                 <div style="display: inline-block; width: 16px; height: 16px; border: 1.5px solid #9ca3af; border-radius: 3px;"></div>
               </td>
             </tr>
@@ -190,14 +166,11 @@ export async function downloadPackingListPDF(invoice: any) {
             .join("")}
           <!-- Total Summary Table Row -->
           <tr style="background: #f3f4f6; border-top: 2px solid #111827; border-bottom: 2px solid #111827;">
-            <td colspan="3" style="padding: 10px 10px; font-weight: 800; font-size: 12px; text-transform: uppercase; color: #111827;">
+            <td colspan="2" style="padding: 10px 12px; font-weight: 800; font-size: 12px; text-transform: uppercase; color: #111827;">
               Total
             </td>
-            <td style="text-align: center; padding: 10px 10px; font-weight: 900; font-size: 15px; color: #1e40af; background: #dbeafe;">
-              ${totalBoxesCount > 0 ? `${totalBoxesCount} Boxes` : "-"}
-            </td>
-            <td style="text-align: right; padding: 10px 10px; font-weight: 800; font-size: 13px; color: #111827;">
-              ${totalSqftCount.toLocaleString()} ${hasFlooringItems ? "sqft" : ""}
+            <td style="text-align: right; padding: 10px 12px; font-weight: 900; font-size: 14px; color: #111827;">
+              ${(invoice.items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0).toLocaleString()}
             </td>
             <td></td>
           </tr>
