@@ -68,7 +68,7 @@ export function QuickAdjustInventoryDialog({
   if (!product) return null;
 
   const currentStock = product.inventory ?? 0;
-  const unit = product.unit || "pcs";
+  const unit = product.unit || "boxes";
   const numQty = parseInt(qty) || 0;
 
   let newStock = currentStock;

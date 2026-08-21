@@ -26,6 +26,8 @@ interface Product {
   category?: string | null;
   inventory?: number | null;
   unit?: string | null;
+  sqftPerBox?: number | string | null;
+  boxesPerPallet?: number | null;
   location?: string | null;
   isActive?: boolean;
 }
@@ -48,8 +50,10 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     cost: product?.cost?.toString() || "0",
     category: product?.category || "",
     inventory: product?.inventory?.toString() || "",
-    unit: product?.unit || "pcs",
-     location: product?.location || "",
+    unit: product?.unit || "boxes",
+    sqftPerBox: product?.sqftPerBox?.toString() || "",
+    boxesPerPallet: product?.boxesPerPallet?.toString() || "",
+    location: product?.location || "",
     isActive: product?.isActive ?? true,
   });
 
@@ -74,6 +78,8 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         category: formData.category || undefined,
         inventory: formData.inventory ? parseInt(formData.inventory) : undefined,
         unit: formData.unit,
+        sqftPerBox: formData.sqftPerBox ? parseFloat(formData.sqftPerBox) : undefined,
+        boxesPerPallet: formData.boxesPerPallet ? parseInt(formData.boxesPerPallet) : undefined,
         location: formData.location || undefined,
         isActive: formData.isActive,
       };
@@ -228,20 +234,50 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
                 onChange={(e) =>
                   setFormData({ ...formData, unit: e.target.value })
                 }
-                placeholder="pcs, kg, etc."
+                placeholder="sqft, pcs, box, etc."
               />
             </div>
-          <div className="space-y-2">
-            <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={formData.location}
-              onChange={(e) =>
-                setFormData({ ...formData, location: e.target.value })
-              }
-              placeholder="Warehouse / Shelf"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="sqftPerBox">Sqft / Box (Coverage)</Label>
+              <Input
+                id="sqftPerBox"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.sqftPerBox}
+                onChange={(e) =>
+                  setFormData({ ...formData, sqftPerBox: e.target.value })
+                }
+                placeholder="e.g. 30.18, 22.72, 18.72"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Used to auto-calculate boxes needed when creating invoices & quotes
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="boxesPerPallet">Boxes / Pallet</Label>
+              <Input
+                id="boxesPerPallet"
+                type="number"
+                min="0"
+                value={formData.boxesPerPallet}
+                onChange={(e) =>
+                  setFormData({ ...formData, boxesPerPallet: e.target.value })
+                }
+                placeholder="e.g. 56, 48"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location">Location / Warehouse</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+                placeholder="Warehouse A, Rack 3"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -25,6 +25,9 @@ const customerSchema = z.object({
   creditLimit: z.number().optional(),
   prepaidCredit: z.number().optional(),
   taxId: z.string().optional(),
+  w9Url: z.string().optional().or(z.literal("")).nullable(),
+  permitUrl: z.string().optional().or(z.literal("")).nullable(),
+  taxDocuments: z.any().optional(),
   notes: z.string().optional(),
 });
 
@@ -144,6 +147,9 @@ export async function PUT(
       paymentTerms: validatedData.paymentTerms || "Net 30",
       creditLimit: validatedData.creditLimit || 0,
       taxId: validatedData.taxId || null,
+      w9Url: validatedData.w9Url !== undefined ? (validatedData.w9Url || null) : existingCustomer.w9Url,
+      permitUrl: validatedData.permitUrl !== undefined ? (validatedData.permitUrl || null) : existingCustomer.permitUrl,
+      taxDocuments: validatedData.taxDocuments !== undefined ? validatedData.taxDocuments : existingCustomer.taxDocuments,
       notes: validatedData.notes || null,
     };
 

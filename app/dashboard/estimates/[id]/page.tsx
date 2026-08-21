@@ -34,6 +34,7 @@ import { ArrowLeft, Mail, Download, FileText, Pencil, Trash2, Copy, Package, Loa
 import { EstimateStatus } from "@prisma/client";
 import { EstimateForm } from "@/components/estimates/estimate-form";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
+import { extractSqftPerBox, calculateFlooringBoxes } from "@/lib/flooring-calculator";
 import { useLanguage } from "@/components/providers/language-context";
 
 interface Estimate {
@@ -76,6 +77,9 @@ interface Estimate {
       id?: string;
       name: string;
       sku: string | null;
+      unit?: string | null;
+      sqftPerBox?: number | null;
+      description?: string | null;
     } | null;
   }>;
 }
@@ -339,17 +343,25 @@ export default function EstimateDetailPage() {
             </tr>
           </thead>
           <tbody>
-            ${estimate.items.map((item) => `
+            ${estimate.items.map((item) => {
+              const sqft = (item as any).sqftPerBox || extractSqftPerBox(item.product?.sqftPerBox || item.product?.description || item.description);
+              const b = sqft ? calculateFlooringBoxes(Number(item.quantity), sqft) : null;
+
+              return `
               <tr>
                 <td>
                   <div class="item-desc">${item.description}</div>
                   ${item.product?.sku ? `<div class="item-sku">SKU: ${item.product.sku}</div>` : ""}
                 </td>
-                <td class="center">${item.quantity}</td>
+                <td class="center">
+                  <div style="font-weight: 700; font-size: 13px; color: #1e40af;">${item.quantity} ${Number(item.quantity) === 1 ? "Box" : "Boxes"}</div>
+                  ${sqft ? `<div style="font-size: 11px; color: #4b5563; margin-top: 1px;">= ${(Number(item.quantity) * sqft).toFixed(2)} sqft</div>` : ""}
+                </td>
                 <td class="right">$${Number(item.rate).toFixed(2)}</td>
                 <td class="right">$${Number(item.amount).toFixed(2)}</td>
               </tr>
-            `).join("")}
+            `;
+            }).join("")}
           </tbody>
         </table>
 
@@ -800,7 +812,30 @@ export default function EstimateDetailPage() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const sqft = (item as any).sqftPerBox || extractSqftPerBox(item.product?.sqftPerBox || item.product?.description || item.description);
+                      const qty = Number(item.quantity || 0);
+                      if (sqft && sqft > 0) {
+                        const totalSqft = parseFloat((qty * sqft).toFixed(2));
+                        return (
+                          <div>
+                            <div className="font-bold text-blue-700 dark:text-blue-300">
+                              {qty} {qty === 1 ? "Box" : "Boxes"}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-medium">
+                              = {totalSqft.toLocaleString()} sqft ({sqft} sf/bx)
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="font-medium">
+                          {qty} {item.product?.unit || "units"}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>${item.rate.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     ${item.amount.toLocaleString()}

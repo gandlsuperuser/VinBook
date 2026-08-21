@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import {
@@ -21,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ArrowLeft, Pencil, Mail, Phone, MapPin, Download } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, MapPin, Download, FileText, Upload, Eye, Trash2, CheckCircle2, AlertCircle, FileCheck, ShieldCheck } from "lucide-react";
 import { CustomerForm } from "@/components/customers/customer-form";
 import {
   Dialog,
@@ -41,6 +42,9 @@ interface Customer {
   paymentTerms: string | null;
   creditLimit: number | null;
   taxId: string | null;
+  w9Url?: string | null;
+  permitUrl?: string | null;
+  taxDocuments?: any;
   notes: string | null;
   outstandingBalance: number;
   totalInvoices: number;
@@ -69,6 +73,8 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [docMessage, setDocMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetchCustomer();
@@ -88,6 +94,106 @@ export default function CustomerDetailPage() {
       console.error("Error fetching customer:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDocumentUpload = async (docType: "w9" | "permit", e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !customer) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setDocMessage({ type: "error", text: "File size must be under 10MB" });
+      return;
+    }
+
+    setUploadingDoc(docType);
+    setDocMessage(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result as string;
+        const res = await fetch(`/api/customers/${customer.id}/documents`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: docType,
+            name: file.name,
+            fileData: base64Data,
+            fileSize: file.size,
+            mimeType: file.type,
+          }),
+        });
+
+        if (res.ok) {
+          setDocMessage({
+            type: "success",
+            text: `${docType === "w9" ? "W-9 Form" : "Sales Permit"} uploaded successfully!`,
+          });
+          fetchCustomer();
+          setTimeout(() => setDocMessage(null), 4000);
+        } else {
+          const err = await res.json();
+          setDocMessage({ type: "error", text: err.error || "Failed to upload document" });
+        }
+        setUploadingDoc(null);
+      };
+      reader.onerror = () => {
+        setDocMessage({ type: "error", text: "Failed to read file" });
+        setUploadingDoc(null);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Upload error:", err);
+      setDocMessage({ type: "error", text: "Upload failed. Please try again." });
+      setUploadingDoc(null);
+    }
+  };
+
+  const handleDocumentDelete = async (docType: "w9" | "permit") => {
+    if (!customer) return;
+    if (!confirm(`Are you sure you want to delete this customer's ${docType === "w9" ? "W-9 Form" : "Sales Tax Permit"}?`)) {
+      return;
+    }
+
+    setUploadingDoc(docType);
+    try {
+      const res = await fetch(`/api/customers/${customer.id}/documents?type=${docType}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setDocMessage({
+          type: "success",
+          text: `${docType === "w9" ? "W-9 Form" : "Sales Permit"} deleted`,
+        });
+        fetchCustomer();
+        setTimeout(() => setDocMessage(null), 4000);
+      } else {
+        setDocMessage({ type: "error", text: "Failed to delete document" });
+      }
+    } catch {
+      setDocMessage({ type: "error", text: "Error deleting document" });
+    } finally {
+      setUploadingDoc(null);
+    }
+  };
+
+  const openDocument = (dataUrl: string, title?: string) => {
+    if (!dataUrl) return;
+    // Open data URL in a new browser tab or download
+    const win = window.open();
+    if (win) {
+      if (dataUrl.startsWith("data:application/pdf")) {
+        win.document.write(
+          `<iframe src="${dataUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`
+        );
+        win.document.title = title || "Customer Document";
+      } else {
+        win.document.write(
+          `<body style="margin:0; background:#111; display:flex; align-items:center; justify-content:center;"><img src="${dataUrl}" style="max-width:100%; max-height:100vh; object-fit:contain;" /></body>`
+        );
+        win.document.title = title || "Customer Document";
+      }
     }
   };
 
@@ -560,6 +666,286 @@ export default function CustomerDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tax & Compliance Documents (W-9 & Sales Permit) */}
+      <Card className="overflow-hidden border shadow-sm">
+        <CardHeader className="bg-muted/20 border-b pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  Tax & Compliance Documents
+                  {customer.w9Url && customer.permitUrl ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      Fully Compliant
+                    </span>
+                  ) : customer.w9Url || customer.permitUrl ? (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                      Partially Documented
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                      Documents Needed
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Upload and manage customer W-9 tax forms and state sales/resale permits
+                </CardDescription>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          {docMessage && (
+            <div
+              className={`p-3 rounded-md text-sm border flex items-center gap-2 ${
+                docMessage.type === "success"
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-red-50 text-red-800 border-red-200"
+              }`}
+            >
+              {docMessage.type === "success" ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+              )}
+              <span>{docMessage.text}</span>
+            </div>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* W-9 Form Tile */}
+            <div className="border rounded-xl p-5 bg-card flex flex-col justify-between space-y-4 shadow-sm hover:border-border/80 transition-colors">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm">Customer W-9 Form</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Taxpayer ID & Certification (Form W-9)
+                      </p>
+                    </div>
+                  </div>
+                  {customer.w9Url ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="h-3 w-3" /> On File
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200">
+                      <AlertCircle className="h-3 w-3" /> Missing
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Required for business identification, 1099 filing, and federal tax compliance.
+                </p>
+              </div>
+
+              {customer.w9Url ? (
+                <div className="pt-2 border-t flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 cursor-pointer flex-1"
+                    onClick={() => openDocument(customer.w9Url!, `${customer.name}_W9`)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                    View / Preview
+                  </Button>
+
+                  <a
+                    href={customer.w9Url}
+                    download={`${customer.name.replace(/\s+/g, "_")}_W9`}
+                    className="inline-flex"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 cursor-pointer"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                      Download
+                    </Button>
+                  </a>
+
+                  <Label
+                    htmlFor="w9-replace-upload"
+                    className="cursor-pointer inline-flex items-center justify-center px-2.5 py-1.5 rounded-md text-xs font-medium border bg-background hover:bg-muted transition-colors h-8"
+                  >
+                    <Upload className="h-3.5 w-3.5 mr-1" />
+                    {uploadingDoc === "w9" ? "Uploading..." : "Replace"}
+                  </Label>
+                  <input
+                    id="w9-replace-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => handleDocumentUpload("w9", e)}
+                    disabled={uploadingDoc === "w9"}
+                    className="hidden"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive text-xs h-8 px-2"
+                    onClick={() => handleDocumentDelete("w9")}
+                    disabled={uploadingDoc === "w9"}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <Label
+                    htmlFor="w9-upload"
+                    className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 bg-muted/20 hover:bg-muted/40 transition-colors text-center"
+                  >
+                    <Upload className="h-5 w-5 text-primary mb-1.5" />
+                    <span className="text-xs font-medium text-primary">
+                      {uploadingDoc === "w9" ? "Uploading W-9..." : "Upload Customer W-9"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      PDF, PNG, JPG (up to 10MB)
+                    </span>
+                  </Label>
+                  <input
+                    id="w9-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => handleDocumentUpload("w9", e)}
+                    disabled={uploadingDoc === "w9"}
+                    className="hidden"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Sales Permit / Resale Certificate Tile */}
+            <div className="border rounded-xl p-5 bg-card flex flex-col justify-between space-y-4 shadow-sm hover:border-border/80 transition-colors">
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                      <FileCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm">Sales Tax / Resale Permit</h4>
+                      <p className="text-xs text-muted-foreground">
+                        State Resale Certificate & Exemption
+                      </p>
+                    </div>
+                  </div>
+                  {customer.permitUrl ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-200">
+                      <CheckCircle2 className="h-3 w-3" /> On File
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 dark:bg-amber-950/50 dark:text-amber-300 px-2 py-0.5 rounded-full border border-amber-200">
+                      <AlertCircle className="h-3 w-3" /> Missing
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Required for tax-exempt wholesale transactions and state sales tax auditing.
+                </p>
+              </div>
+
+              {customer.permitUrl ? (
+                <div className="pt-2 border-t flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-8 cursor-pointer flex-1"
+                    onClick={() => openDocument(customer.permitUrl!, `${customer.name}_Sales_Permit`)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                    View / Preview
+                  </Button>
+
+                  <a
+                    href={customer.permitUrl}
+                    download={`${customer.name.replace(/\s+/g, "_")}_Sales_Permit`}
+                    className="inline-flex"
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-8 cursor-pointer"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                      Download
+                    </Button>
+                  </a>
+
+                  <Label
+                    htmlFor="permit-replace-upload"
+                    className="cursor-pointer inline-flex items-center justify-center px-2.5 py-1.5 rounded-md text-xs font-medium border bg-background hover:bg-muted transition-colors h-8"
+                  >
+                    <Upload className="h-3.5 w-3.5 mr-1" />
+                    {uploadingDoc === "permit" ? "Uploading..." : "Replace"}
+                  </Label>
+                  <input
+                    id="permit-replace-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => handleDocumentUpload("permit", e)}
+                    disabled={uploadingDoc === "permit"}
+                    className="hidden"
+                  />
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive text-xs h-8 px-2"
+                    onClick={() => handleDocumentDelete("permit")}
+                    disabled={uploadingDoc === "permit"}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="pt-2">
+                  <Label
+                    htmlFor="permit-upload"
+                    className="cursor-pointer flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-4 bg-muted/20 hover:bg-muted/40 transition-colors text-center"
+                  >
+                    <Upload className="h-5 w-5 text-emerald-600 mb-1.5" />
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                      {uploadingDoc === "permit" ? "Uploading Sales Permit..." : "Upload Sales Permit"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground mt-0.5">
+                      PDF, PNG, JPG (up to 10MB)
+                    </span>
+                  </Label>
+                  <input
+                    id="permit-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    onChange={(e) => handleDocumentUpload("permit", e)}
+                    disabled={uploadingDoc === "permit"}
+                    className="hidden"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Invoices */}
       <Card>

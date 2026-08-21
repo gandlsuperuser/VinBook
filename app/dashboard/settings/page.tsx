@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, Building2, Upload, Trash2, Image as ImageIcon } from "lucide-react";
+import { Save, Building2, Upload, Trash2, Image as ImageIcon, Database, HardDrive, RefreshCw, CheckCircle2, AlertTriangle, Table2, Layers } from "lucide-react";
 
 interface OrganizationSettings {
   logoUrl?: string;
@@ -33,12 +33,41 @@ interface Organization {
   settings: OrganizationSettings | null;
 }
 
+interface DatabaseUsage {
+  usedBytes: number;
+  usedMB: number;
+  maxMB: number;
+  percentage: number;
+  status: "healthy" | "warning" | "critical";
+  planLabel: string;
+  tables: Array<{
+    tableName: string;
+    bytes: number;
+    prettySize: string;
+    rows: number;
+  }>;
+  counts: {
+    invoices: number;
+    customers: number;
+    products: number;
+    expenses: number;
+    estimates: number;
+    payments: number;
+    ledgerEntries: number;
+    inventoryLogs: number;
+    bankAccounts: number;
+  };
+}
+
 export default function SettingsPage() {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [dbUsage, setDbUsage] = useState<DatabaseUsage | null>(null);
+  const [loadingDbUsage, setLoadingDbUsage] = useState(false);
+  const [showDbDetails, setShowDbDetails] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -55,7 +84,23 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchOrganization();
+    fetchDbUsage();
   }, []);
+
+  const fetchDbUsage = async () => {
+    setLoadingDbUsage(true);
+    try {
+      const res = await fetch("/api/system/database-usage");
+      if (res.ok) {
+        const data = await res.json();
+        setDbUsage(data);
+      }
+    } catch (e) {
+      console.error("Error fetching db usage:", e);
+    } finally {
+      setLoadingDbUsage(false);
+    }
+  };
 
   const fetchOrganization = async () => {
     try {
@@ -393,6 +438,178 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </form>
+
+      {/* Supabase Database Storage & Usage Card */}
+      <Card className="overflow-hidden border shadow-sm">
+        <CardHeader className="bg-muted/20 border-b pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400">
+                <Database className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  Supabase Database Storage Usage
+                  {dbUsage && (
+                    <span
+                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        dbUsage.status === "healthy"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          : dbUsage.status === "warning"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                          : "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300"
+                      }`}
+                    >
+                      {dbUsage.status === "healthy"
+                        ? "Healthy"
+                        : dbUsage.status === "warning"
+                        ? "Approaching Limit"
+                        : "High Usage"}
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Live storage allocation on Supabase PostgreSQL cloud database
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchDbUsage}
+              disabled={loadingDbUsage}
+              className="cursor-pointer text-xs"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 mr-1.5 ${
+                  loadingDbUsage ? "animate-spin" : ""
+                }`}
+              />
+              {loadingDbUsage ? "Checking..." : "Refresh Usage"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6 pt-6">
+          {dbUsage ? (
+            <>
+              {/* Storage Usage Progress Bar */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 font-medium">
+                    <HardDrive className="h-4 w-4 text-muted-foreground" />
+                    <span>Database Disk Space</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-bold text-foreground text-base">
+                      {dbUsage.usedMB} MB
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      / {dbUsage.maxMB} MB ({dbUsage.percentage}% Used)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Bar Container */}
+                <div className="h-4 w-full bg-muted/60 rounded-full overflow-hidden p-0.5 border border-border">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      dbUsage.percentage < 60
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                        : dbUsage.percentage < 80
+                        ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                        : "bg-gradient-to-r from-rose-500 to-red-600"
+                    }`}
+                    style={{ width: `${Math.max(1.5, Math.min(100, dbUsage.percentage))}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>0 MB</span>
+                  <span className="font-medium text-foreground/80">{dbUsage.planLabel}</span>
+                  <span>{dbUsage.maxMB} MB (Free Quota)</span>
+                </div>
+              </div>
+
+              {/* Summary Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                <div className="p-3 bg-muted/30 border rounded-lg">
+                  <div className="text-xs text-muted-foreground">Invoices</div>
+                  <div className="text-xl font-bold mt-1 text-foreground">
+                    {dbUsage.counts.invoices}
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/30 border rounded-lg">
+                  <div className="text-xs text-muted-foreground">Customers</div>
+                  <div className="text-xl font-bold mt-1 text-foreground">
+                    {dbUsage.counts.customers}
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/30 border rounded-lg">
+                  <div className="text-xs text-muted-foreground">Catalog Products</div>
+                  <div className="text-xl font-bold mt-1 text-foreground">
+                    {dbUsage.counts.products}
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/30 border rounded-lg">
+                  <div className="text-xs text-muted-foreground">Ledger Entries</div>
+                  <div className="text-xl font-bold mt-1 text-foreground">
+                    {dbUsage.counts.ledgerEntries}
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Breakdown Accordion / Toggle */}
+              <div className="border-t pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowDbDetails(!showDbDetails)}
+                  className="flex items-center justify-between w-full text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Table2 className="h-3.5 w-3.5" />
+                    {showDbDetails ? "Hide Table Breakdown" : "View Supabase PostgreSQL Table Sizes Breakdown"}
+                  </span>
+                  <span>{showDbDetails ? "▲ Hide" : "▼ Show (10 Tables)"}</span>
+                </button>
+
+                {showDbDetails && dbUsage.tables.length > 0 && (
+                  <div className="mt-3 border rounded-lg overflow-hidden animate-in fade-in-0 duration-200">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-muted/60 text-muted-foreground font-semibold border-b">
+                        <tr>
+                          <th className="p-2">Table Name</th>
+                          <th className="p-2 text-right">Estimated Rows</th>
+                          <th className="p-2 text-right">Disk Size</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {dbUsage.tables.map((t) => (
+                          <tr key={t.tableName} className="hover:bg-muted/20">
+                            <td className="p-2 font-mono font-medium text-foreground">
+                              {t.tableName}
+                            </td>
+                            <td className="p-2 text-right text-muted-foreground">
+                              {t.rows.toLocaleString()}
+                            </td>
+                            <td className="p-2 text-right font-medium text-foreground">
+                              {t.prettySize}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {loadingDbUsage ? "Loading Supabase database usage metrics..." : "Unable to load database metrics."}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

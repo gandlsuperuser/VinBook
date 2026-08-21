@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { prisma } from "@/db/prisma";
 import { z } from "zod";
 import { InvoiceStatus } from "@prisma/client";
+import { deductInventoryForInvoice } from "@/lib/inventory";
 
 const invoiceItemSchema = z.object({
   productId: z.string().optional(),
@@ -241,6 +242,15 @@ export async function POST(request: Request) {
           },
         },
       },
+    });
+
+    // Deduct stock for all tracked items
+    await deductInventoryForInvoice({
+      organizationId: user.organizationId,
+      invoiceNumber: invoice.number,
+      customerName: invoice.customer?.name,
+      performedBy: user.name || user.email,
+      items: validatedData.items,
     });
 
     return NextResponse.json(invoice, { status: 201 });

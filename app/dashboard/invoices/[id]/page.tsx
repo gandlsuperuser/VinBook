@@ -45,6 +45,7 @@ import { ArrowLeft, Mail, Download, DollarSign, Pencil, Trash2, Package } from "
 import { InvoiceStatus, PaymentMethod } from "@prisma/client";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
+import { extractSqftPerBox, calculateFlooringBoxes } from "@/lib/flooring-calculator";
 import { useLanguage } from "@/components/providers/language-context";
 
 interface Invoice {
@@ -85,6 +86,9 @@ interface Invoice {
       id: string;
       name: string;
       sku: string | null;
+      unit?: string | null;
+      sqftPerBox?: number | null;
+      description?: string | null;
     } | null;
   }>;
   payments: Array<{
@@ -413,17 +417,25 @@ export default function InvoiceDetailPage() {
           <tbody>
             ${invoice.items
           .map(
-            (item) => `
+            (item) => {
+              const sqft = (item as any).sqftPerBox || extractSqftPerBox(item.product?.sqftPerBox || item.product?.description || item.description);
+              const b = sqft ? calculateFlooringBoxes(Number(item.quantity), sqft) : null;
+
+              return `
               <tr style="border-bottom: 1px solid #ddd;">
                 <td style="padding: 10px 0;">
                   <div style="font-weight: 500;">${item.description}</div>
                   ${item.product?.sku ? `<div style="font-size: 11px; color: #666;">SKU: ${item.product.sku}</div>` : ""}
                 </td>
-                <td style="text-align: center; padding: 10px 0;">${item.quantity}</td>
+                <td style="text-align: center; padding: 10px 0;">
+                  <div style="font-weight: 700; font-size: 13px; color: #1e40af;">${item.quantity} ${Number(item.quantity) === 1 ? "Box" : "Boxes"}</div>
+                  ${sqft ? `<div style="font-size: 11px; color: #4b5563; margin-top: 1px;">= ${(Number(item.quantity) * sqft).toFixed(2)} sqft</div>` : ""}
+                </td>
                 <td style="text-align: right; padding: 10px 0;">$${Number(item.rate).toFixed(2)}</td>
                 <td style="text-align: right; padding: 10px 0;">$${Number(item.amount).toFixed(2)}</td>
               </tr>
-            `
+            `;
+            }
           )
           .join("")}
           </tbody>
@@ -860,7 +872,30 @@ export default function InvoiceDetailPage() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      const sqft = (item as any).sqftPerBox || extractSqftPerBox(item.product?.sqftPerBox || item.product?.description || item.description);
+                      const qty = Number(item.quantity || 0);
+                      if (sqft && sqft > 0) {
+                        const totalSqft = parseFloat((qty * sqft).toFixed(2));
+                        return (
+                          <div>
+                            <div className="font-bold text-blue-700 dark:text-blue-300">
+                              {qty} {qty === 1 ? "Box" : "Boxes"}
+                            </div>
+                            <div className="text-xs text-muted-foreground font-medium">
+                              = {totalSqft.toLocaleString()} sqft ({sqft} sf/bx)
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="font-medium">
+                          {qty} {item.product?.unit || "units"}
+                        </div>
+                      );
+                    })()}
+                  </TableCell>
                   <TableCell>${item.rate.toLocaleString()}</TableCell>
                   <TableCell className="text-right">
                     ${item.amount.toLocaleString()}

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { prisma } from "@/db/prisma";
 import { z } from "zod";
 import { EstimateStatus, InvoiceStatus } from "@prisma/client";
+import { deductInventoryForInvoice } from "@/lib/inventory";
 
 const estimateItemSchema = z.object({
   productId: z.string().optional(),
@@ -294,6 +295,15 @@ export async function POST(
           },
         },
       },
+    });
+
+    // Deduct stock for all tracked items
+    await deductInventoryForInvoice({
+      organizationId: user.organizationId,
+      invoiceNumber: invoice.number,
+      customerName: invoice.customer?.name,
+      performedBy: user.name || user.email,
+      items: estimate.items,
     });
 
     // Mark estimate as converted

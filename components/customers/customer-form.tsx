@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FileText, FileCheck, Upload, Trash2, CheckCircle2 } from "lucide-react";
 
 interface Customer {
   id?: string;
@@ -36,6 +37,8 @@ interface Customer {
   creditLimit?: number | null;
   prepaidCredit?: number | null;
   taxId?: string | null;
+  w9Url?: string | null;
+  permitUrl?: string | null;
   notes?: string | null;
 }
 
@@ -70,8 +73,29 @@ export function CustomerForm({ customer, onSuccess, onCancel }: CustomerFormProp
     creditLimit: customer?.creditLimit?.toString() || "",
     prepaidCredit: customer?.prepaidCredit?.toString() || "",
     taxId: customer?.taxId || "",
+    w9Url: customer?.w9Url || "",
+    permitUrl: customer?.permitUrl || "",
     notes: customer?.notes || "",
   });
+
+  const handleFileUpload = (
+    field: "w9Url" | "permitUrl",
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size must be less than 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFormData((prev) => ({ ...prev, [field]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +114,8 @@ export function CustomerForm({ customer, onSuccess, onCancel }: CustomerFormProp
         prepaidCredit: formData.prepaidCredit && formData.prepaidCredit.trim() !== "" 
           ? parseFloat(formData.prepaidCredit) 
           : 0,
+        w9Url: formData.w9Url || undefined,
+        permitUrl: formData.permitUrl || undefined,
         billingAddress: Object.values(formData.billingAddress).some(v => v)
           ? formData.billingAddress
           : undefined,
@@ -396,6 +422,112 @@ export function CustomerForm({ customer, onSuccess, onCancel }: CustomerFormProp
               }
               placeholder="Manual prepaid credit/adjustment"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Tax & Compliance Documents */}
+      <div className="space-y-4 pt-2 border-t">
+        <h3 className="text-lg font-semibold">Tax & Compliance Documents</h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* W-9 Upload */}
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <FileText className="h-4 w-4 text-primary" />
+                Customer W-9 Form
+              </Label>
+              {formData.w9Url && (
+                <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Attached
+                </span>
+              )}
+            </div>
+
+            {formData.w9Url ? (
+              <div className="flex items-center justify-between gap-2 p-2 bg-background border rounded-md">
+                <span className="text-xs truncate text-muted-foreground">W-9 Form Document attached</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => setFormData({ ...formData, w9Url: "" })}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Label
+                  htmlFor="form-w9-upload"
+                  className="cursor-pointer flex items-center justify-center gap-2 p-2.5 border border-dashed rounded-md bg-background hover:bg-muted text-xs font-medium text-primary transition-colors"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload W-9 Form (PDF/Image)
+                </Label>
+                <input
+                  id="form-w9-upload"
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={(e) => handleFileUpload("w9Url", e)}
+                  className="hidden"
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Form W-9 for 1099 reporting and tax identification.
+            </p>
+          </div>
+
+          {/* Sales Permit Upload */}
+          <div className="space-y-2 p-3 border rounded-lg bg-muted/20">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <FileCheck className="h-4 w-4 text-emerald-600" />
+                Sales Tax / Resale Permit
+              </Label>
+              {formData.permitUrl && (
+                <span className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Attached
+                </span>
+              )}
+            </div>
+
+            {formData.permitUrl ? (
+              <div className="flex items-center justify-between gap-2 p-2 bg-background border rounded-md">
+                <span className="text-xs truncate text-muted-foreground">Resale Permit Document attached</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => setFormData({ ...formData, permitUrl: "" })}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <Label
+                  htmlFor="form-permit-upload"
+                  className="cursor-pointer flex items-center justify-center gap-2 p-2.5 border border-dashed rounded-md bg-background hover:bg-muted text-xs font-medium text-emerald-600 dark:text-emerald-400 transition-colors"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Upload Sales Permit (PDF/Image)
+                </Label>
+                <input
+                  id="form-permit-upload"
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={(e) => handleFileUpload("permitUrl", e)}
+                  className="hidden"
+                />
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Resale certificate or exemption permit for tax-free orders.
+            </p>
           </div>
         </div>
       </div>

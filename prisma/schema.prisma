@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // User model for authentication and authorization
@@ -119,6 +120,9 @@ model Customer {
   creditLimit     Decimal? @default(0) @db.Decimal(10, 2)
   prepaidCredit   Decimal? @default(0) @db.Decimal(10, 2) // Manual prepaid credit/adjustment
   taxId           String?
+  w9Url           String?   // URL or Base64 / document link for Customer W-9 Form
+  permitUrl       String?   // URL or Base64 / document link for Sales Tax / Resale Permit
+  taxDocuments    Json?     // Array of attached documents { id, name, type, url, size, uploadedAt }
   notes           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -165,6 +169,8 @@ model Product {
   category      String?
   inventory     Int?          // Optional inventory tracking
   unit          String?       @default("pcs")
+  sqftPerBox    Decimal?      @db.Decimal(10, 2) // Coverage per box (e.g. 30.18, 22.72, 18.72)
+  boxesPerPallet Int?         // Boxes per pallet (e.g. 56, 48)
   location      String?       // Optional inventory location / warehouse
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
@@ -261,6 +267,8 @@ model InvoiceItem {
   rate        Decimal  @default(0) @db.Decimal(10, 2)
   amount      Decimal  @default(0) @db.Decimal(10, 2)
   tax         Decimal  @default(0) @db.Decimal(10, 2)
+  sqftPerBox  Decimal? @db.Decimal(10, 2) // Sqft coverage per box
+  boxes       Decimal? @db.Decimal(10, 2) // Calculated or specified number of boxes
   order       Int      @default(0) // Order of items in invoice
 
   @@index([invoiceId])
@@ -354,6 +362,8 @@ model EstimateItem {
   rate        Decimal  @default(0) @db.Decimal(10, 2)
   amount      Decimal  @default(0) @db.Decimal(10, 2)
   tax         Decimal  @default(0) @db.Decimal(10, 2)
+  sqftPerBox  Decimal? @db.Decimal(10, 2) // Sqft coverage per box
+  boxes       Decimal? @db.Decimal(10, 2) // Calculated or specified number of boxes
   order       Int      @default(0)
 
   @@index([estimateId])

@@ -43,13 +43,17 @@ import { ProductType } from "@prisma/client";
 interface Product {
   id: string;
   name: string;
+  description?: string | null;
   sku: string | null;
   type: ProductType;
   price: number;
   cost: number;
   category: string | null;
   inventory: number | null;
-   location: string | null;
+  unit: string | null;
+  sqftPerBox?: number | null;
+  boxesPerPallet?: number | null;
+  location: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -232,7 +236,7 @@ export default function ProductsPage() {
               <TableHead>Price</TableHead>
               <TableHead>Cost</TableHead>
               {typeFilter === ProductType.PRODUCT || typeFilter === "all" ? (
-                <TableHead>Inventory</TableHead>
+                <TableHead>Stock (Boxes)</TableHead>
               ) : null}
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -273,9 +277,20 @@ export default function ProductsPage() {
                   {(typeFilter === ProductType.PRODUCT ||
                     typeFilter === "all") && (
                     <TableCell>
-                      {product.inventory !== null
-                        ? product.inventory
-                        : "N/A"}
+                      {product.inventory !== null ? (
+                        <div>
+                          <div className="font-bold text-blue-700 dark:text-blue-400">
+                            {Number(product.inventory).toLocaleString()} {product.unit || "boxes"}
+                          </div>
+                          {product.sqftPerBox && Number(product.sqftPerBox) > 0 && (
+                            <div className="text-xs text-muted-foreground font-medium">
+                              = {(Number(product.inventory) * Number(product.sqftPerBox)).toLocaleString()} sqft
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Not tracked</span>
+                      )}
                     </TableCell>
                   )}
                   <TableCell>

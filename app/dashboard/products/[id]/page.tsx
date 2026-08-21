@@ -43,6 +43,8 @@ interface Product {
   category: string | null;
   inventory: number | null;
   unit: string | null;
+  sqftPerBox?: number | null;
+  boxesPerPallet?: number | null;
   location: string | null;
   isActive: boolean;
   invoiceItems: Array<{
@@ -234,12 +236,17 @@ export default function ProductDetailPage() {
             {product.type === ProductType.PRODUCT && (
               <>
                 <div>
-                  <div className="text-sm text-muted-foreground">Inventory</div>
-                  <div className="font-medium">
+                  <div className="text-sm text-muted-foreground">Stock Inventory</div>
+                  <div className="font-bold text-base text-blue-700 dark:text-blue-400">
                     {product.inventory !== null
-                      ? `${product.inventory} ${product.unit || "pcs"}`
+                      ? `${Number(product.inventory).toLocaleString()} ${product.unit || "boxes"}`
                       : "Not tracked"}
                   </div>
+                  {product.inventory !== null && product.sqftPerBox && Number(product.sqftPerBox) > 0 && (
+                    <div className="text-xs text-muted-foreground font-medium">
+                      = {(Number(product.inventory) * Number(product.sqftPerBox)).toLocaleString()} sqft ({product.sqftPerBox} sf/bx)
+                    </div>
+                  )}
                 </div>
                 {product.inventory !== null && product.cost > 0 && (
                   <div>

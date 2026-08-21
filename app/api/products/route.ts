@@ -14,6 +14,8 @@ const productSchema = z.object({
   category: z.string().optional(),
   inventory: z.number().int().optional(),
   unit: z.string().optional(),
+  sqftPerBox: z.number().optional().nullable(),
+  boxesPerPallet: z.number().int().optional().nullable(),
   location: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -104,6 +106,8 @@ export async function POST(request: Request) {
         category: validatedData.category || null,
         inventory: validatedData.inventory || null,
         unit: validatedData.unit || "pcs",
+        sqftPerBox: validatedData.sqftPerBox ? validatedData.sqftPerBox : null,
+        boxesPerPallet: validatedData.boxesPerPallet || null,
         location: validatedData.location || null,
         isActive: validatedData.isActive ?? true,
       },

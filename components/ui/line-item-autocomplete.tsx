@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { Package, Search, Check, Sparkles, Tag, Layers, X } from "lucide-react";
+import { Package, Search, Check, Sparkles, Tag, Layers, X, Box } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { extractSqftPerBox } from "@/lib/flooring-calculator";
 
 export interface ProductSuggestion {
   id: string;
@@ -15,6 +16,8 @@ export interface ProductSuggestion {
   category?: string | null;
   inventory?: number | null;
   unit?: string | null;
+  sqftPerBox?: number | string | null;
+  boxesPerPallet?: number | null;
   isActive?: boolean;
 }
 
@@ -239,15 +242,8 @@ export function LineItemAutocomplete({
           autoComplete="off"
         />
 
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-muted-foreground pointer-events-none">
-          {linkedProduct ? (
-            <span className="text-[10px] bg-primary/10 text-primary font-medium px-1.5 py-0.5 rounded flex items-center gap-1">
-              <Package className="h-3 w-3" />
-              {linkedProduct.sku || "Catalog"}
-            </span>
-          ) : (
-            <Search className="h-3.5 w-3.5 opacity-40" />
-          )}
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center text-muted-foreground pointer-events-none">
+          <Search className="h-3.5 w-3.5 opacity-30" />
         </div>
       </div>
 
@@ -263,6 +259,14 @@ export function LineItemAutocomplete({
                 SKU: {linkedProduct.sku}
               </span>
             )}
+            {(() => {
+              const sqft = extractSqftPerBox(linkedProduct);
+              return sqft ? (
+                <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 px-1.5 py-0.2 rounded font-medium flex items-center gap-1">
+                  <Box className="h-2.5 w-2.5" /> {sqft} sqft/box
+                </span>
+              ) : null;
+            })()}
             {linkedProduct.inventory !== null && linkedProduct.inventory !== undefined && (
               <span
                 className={cn(
@@ -272,7 +276,7 @@ export function LineItemAutocomplete({
                     : "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30"
                 )}
               >
-                Stock: {linkedProduct.inventory} {linkedProduct.unit || "pcs"}
+                Stock: {linkedProduct.inventory} {linkedProduct.unit || "boxes"}
               </span>
             )}
           </div>
@@ -358,6 +362,15 @@ export function LineItemAutocomplete({
                           {product.category}
                         </span>
                       )}
+                      {(() => {
+                        const sqft = extractSqftPerBox(product);
+                        return sqft ? (
+                          <span className="text-[11px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-1.5 py-0.2 rounded flex items-center gap-1">
+                            <Box className="h-2.5 w-2.5" />
+                            {sqft} sqft/bx
+                          </span>
+                        ) : null;
+                      })()}
                       {product.inventory !== null && product.inventory !== undefined && (
                         <span
                           className={cn(
@@ -368,7 +381,7 @@ export function LineItemAutocomplete({
                           )}
                         >
                           {Number(product.inventory) > 0
-                            ? `${product.inventory} ${product.unit || "pcs"} in stock`
+                            ? `${product.inventory} ${product.unit || "boxes"} in stock`
                             : "Out of stock"}
                         </span>
                       )}

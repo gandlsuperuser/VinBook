@@ -32,6 +32,8 @@ interface Customer {
   phone: string | null;
   paymentTerms: string | null;
   creditLimit: number | null;
+  w9Url?: string | null;
+  permitUrl?: string | null;
   createdAt: string;
   invoices: Array<{ status: string; total: number }>;
 }
@@ -166,6 +168,7 @@ export default function CustomersPage() {
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Payment Terms</TableHead>
+              <TableHead>Tax Docs</TableHead>
               <TableHead>Credit Limit</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -173,13 +176,13 @@ export default function CustomersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : customers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center">
+                <TableCell colSpan={7} className="text-center">
                   No customers found
                 </TableCell>
               </TableRow>
@@ -197,6 +200,30 @@ export default function CustomersPage() {
                   <TableCell>{customer.email || "-"}</TableCell>
                   <TableCell>{customer.phone || "-"}</TableCell>
                   <TableCell>{customer.paymentTerms || "-"}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          customer.w9Url
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground/70"
+                        }`}
+                        title={customer.w9Url ? "W-9 Form on file" : "W-9 Form missing"}
+                      >
+                        W-9 {customer.w9Url ? "✓" : "✗"}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                          customer.permitUrl
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground/70"
+                        }`}
+                        title={customer.permitUrl ? "Sales Permit on file" : "Sales Permit missing"}
+                      >
+                        Permit {customer.permitUrl ? "✓" : "✗"}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {customer.creditLimit
                       ? `$${customer.creditLimit.toLocaleString()}`

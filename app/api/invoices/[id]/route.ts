@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth-utils";
 import { prisma } from "@/db/prisma";
 import { z } from "zod";
 import { InvoiceStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
+import { deductInventoryForInvoice, restoreInventoryForInvoice } from "@/lib/inventory";
 
 const invoiceItemSchema = z.object({
   productId: z.string().optional(),
@@ -321,6 +322,8 @@ export async function DELETE(
       },
       include: {
         payments: true,
+        items: true,
+        customer: true,
       },
     });
 
@@ -341,6 +344,15 @@ export async function DELETE(
         { status: 400 }
       );
     }
+
+    // Restore product inventory
+    await restoreInventoryForInvoice({
+      organizationId: user.organizationId,
+      invoiceNumber: invoice.number,
+      customerName: invoice.customer?.name,
+      performedBy: user.name || user.email,
+      items: invoice.items,
+    });
 
     // Delete invoice (items and payments will be cascade deleted)
     await prisma.invoice.delete({

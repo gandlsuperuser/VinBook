@@ -12,10 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus, Trash2 } from "lucide-react";
+import { X, Plus, Trash2, Box, Sparkles } from "lucide-react";
 import { InvoiceStatus } from "@prisma/client";
 import { useLanguage } from "@/components/providers/language-context";
 import { LineItemAutocomplete } from "@/components/ui/line-item-autocomplete";
+import {
+  extractSqftPerBox,
+  calculateFlooringBoxes,
+  calculateSqftFromBoxes,
+  calculateLineItemAmount,
+} from "@/lib/flooring-calculator";
 
 interface InvoiceItem {
   id?: string;
@@ -25,6 +31,8 @@ interface InvoiceItem {
   rate: number;
   amount: number;
   tax?: number;
+  sqftPerBox?: number;
+  boxes?: number;
 }
 
 interface Invoice {
@@ -139,8 +147,8 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     }
   };
 
-  const calculateItemAmount = (quantity: number, rate: number) => {
-    return Number(quantity || 0) * Number(rate || 0);
+  const calculateItemAmount = (quantityBoxes: number, rate: number, sqftPerBox?: number) => {
+    return calculateLineItemAmount(quantityBoxes, rate, sqftPerBox).amount;
   };
 
   const calculateTotals = () => {
@@ -167,21 +175,30 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
       } else {
         const product = products.find((p) => p.id === value);
         if (product) {
+          const sqft = extractSqftPerBox(product);
           item.productId = value;
           item.description = product.name;
           item.rate = product.price;
-          item.quantity = 1;
-          item.amount = calculateItemAmount(1, product.price);
+          item.quantity = item.quantity > 0 ? item.quantity : 1;
+          item.sqftPerBox = sqft || undefined;
+          item.boxes = item.quantity;
+          item.amount = calculateItemAmount(item.quantity, product.price, sqft || undefined);
         }
       }
     } else if (field === "quantity") {
       item.quantity = parseFloat(value) || 0;
-      item.amount = calculateItemAmount(item.quantity, item.rate);
+      item.boxes = item.quantity;
+      item.amount = calculateItemAmount(item.quantity, item.rate, item.sqftPerBox);
     } else if (field === "rate") {
       item.rate = parseFloat(value) || 0;
-      item.amount = calculateItemAmount(item.quantity, item.rate);
+      item.amount = calculateItemAmount(item.quantity, item.rate, item.sqftPerBox);
     } else if (field === "description") {
       item.description = value;
+      const parsedSqft = extractSqftPerBox(value);
+      if (parsedSqft) {
+        item.sqftPerBox = parsedSqft;
+      }
+      item.amount = calculateItemAmount(item.quantity, item.rate, item.sqftPerBox);
     } else if (field === "tax") {
       item.tax = value ? parseFloat(value) : undefined;
     } else if (field === "id") {
@@ -197,13 +214,28 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
     const item = { ...newItems[index] };
     const price = Number(product.price) || 0;
     const qty = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+    const sqft = extractSqftPerBox(product);
 
     item.productId = product.id;
     item.description = product.name;
     item.rate = price;
     item.quantity = qty;
-    item.amount = calculateItemAmount(qty, price);
+    item.sqftPerBox = sqft || undefined;
+    item.boxes = qty;
+    item.amount = calculateItemAmount(qty, price, sqft || undefined);
 
+    newItems[index] = item;
+    setFormData({ ...formData, items: newItems });
+  };
+
+  const handleConvertSqftToBoxes = (index: number, targetSqft: number, sqftPerBox: number) => {
+    const boxes = Math.ceil(targetSqft / sqftPerBox);
+    const newItems = [...formData.items];
+    const item = { ...newItems[index] };
+    item.quantity = boxes;
+    item.boxes = boxes;
+    item.sqftPerBox = sqftPerBox;
+    item.amount = calculateItemAmount(boxes, item.rate, sqftPerBox);
     newItems[index] = item;
     setFormData({ ...formData, items: newItems });
   };
@@ -467,28 +499,64 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
                 />
               </div>
               <div className="col-span-2">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={item.quantity}
-                  onChange={(e) =>
-                    handleItemChange(index, "quantity", e.target.value)
-                  }
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="Boxes"
+                    value={item.quantity}
+                    onChange={(e) =>
+                      handleItemChange(index, "quantity", e.target.value)
+                    }
+                    className="pr-8"
+                    required
+                  />
+                  <span className="absolute right-2 top-2.5 text-xs text-muted-foreground pointer-events-none font-medium">
+                    {item.sqftPerBox ? "bx" : "qty"}
+                  </span>
+                </div>
+                {(() => {
+                  const sqftPerBox = item.sqftPerBox || extractSqftPerBox(item.description);
+                  if (!sqftPerBox || Number(item.quantity) <= 0) return null;
+                  const totalSqft = parseFloat((Number(item.quantity) * sqftPerBox).toFixed(2));
+                  const pricePerBox = parseFloat((sqftPerBox * Number(item.rate || 0)).toFixed(2));
+
+                  return (
+                    <div className="mt-1 space-y-0.5">
+                      <div className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 px-1.5 py-0.5 rounded border border-blue-200/60 flex items-center justify-between">
+                        <span>📦 = {totalSqft.toLocaleString()} sqft</span>
+                        <span className="text-[10px] text-muted-foreground">({sqftPerBox} sf/bx)</span>
+                      </div>
+                      {Number(item.rate) > 0 && (
+                        <div className="text-[10px] text-muted-foreground px-0.5 flex justify-between">
+                          <span>${Number(item.rate).toFixed(2)}/sf</span>
+                          <span className="font-medium text-foreground/80">${pricePerBox.toFixed(2)}/bx</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="col-span-2">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={item.rate}
-                  onChange={(e) =>
-                    handleItemChange(index, "rate", e.target.value)
-                  }
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={item.rate}
+                    onChange={(e) =>
+                      handleItemChange(index, "rate", e.target.value)
+                    }
+                    className={item.sqftPerBox ? "pr-10" : ""}
+                    required
+                  />
+                  {item.sqftPerBox ? (
+                    <span className="absolute right-2 top-2.5 text-[11px] text-muted-foreground pointer-events-none">
+                      /sqft
+                    </span>
+                  ) : null}
+                </div>
               </div>
               <div className="col-span-2 flex items-center font-medium pt-2">
                 {`$${Number(item.amount).toFixed(2)}`}
