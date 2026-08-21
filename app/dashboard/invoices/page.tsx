@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Search, Eye, Pencil, Package, Loader2, GripVertical, RotateCcw, Settings2, Calendar, AlertCircle, FileText } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Package, Loader2, GripVertical, RotateCcw, Settings2, Calendar, AlertCircle, FileText, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 import { InvoiceStatus } from "@prisma/client";
 import { downloadPackingListPDF } from "@/lib/packing-list-pdf";
@@ -247,6 +247,18 @@ export default function InvoicesPage() {
   );
   const [draggedColIndex, setDraggedColIndex] = useState<number | null>(null);
   const [dragOverColIndex, setDragOverColIndex] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<string>("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  const handleSort = (colId: ColumnId) => {
+    if (colId === "actions") return;
+    if (sortBy === colId) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(colId);
+      setSortOrder(colId === "date" ? "desc" : "asc");
+    }
+  };
 
   const getColumnLabel = (id: ColumnId): string => {
     switch (id) {
@@ -422,6 +434,8 @@ export default function InvoicesPage() {
       if (search) params.append("search", search);
       if (statusFilter !== "all") params.append("status", statusFilter);
       if (customerFilter !== "all") params.append("customerId", customerFilter);
+      if (sortBy) params.append("sortBy", sortBy);
+      if (sortOrder) params.append("sortOrder", sortOrder);
 
       const dateRange = getDateRangeForPreset(
         dateFilter,
@@ -451,7 +465,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     fetchInvoices();
-  }, [page, search, statusFilter, customerFilter, dateFilter, customStartDate, customEndDate]);
+  }, [page, search, statusFilter, customerFilter, dateFilter, customStartDate, customEndDate, sortBy, sortOrder]);
 
   const handleDeleteInvoice = async (id: string) => {
     if (!confirm(t("common.confirmDelete"))) {
@@ -812,11 +826,33 @@ export default function InvoicesPage() {
                       }`}
                     >
                       {!isActions && (
-                        <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0" />
+                        <GripVertical className="h-3 w-3 text-muted-foreground/50 shrink-0 cursor-grab" />
                       )}
-                      <span className="font-semibold text-xs text-foreground uppercase tracking-wider">
-                        {getColumnLabel(col.id)}
-                      </span>
+                      {!isActions ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSort(col.id)}
+                          className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer group"
+                          title={`Sort by ${getColumnLabel(col.id)}`}
+                        >
+                          <span className={`font-semibold text-xs uppercase tracking-wider ${sortBy === col.id ? "text-primary font-bold" : "text-foreground"}`}>
+                            {getColumnLabel(col.id)}
+                          </span>
+                          {sortBy === col.id ? (
+                            sortOrder === "asc" ? (
+                              <ArrowUp className="h-3.5 w-3.5 text-primary shrink-0" />
+                            ) : (
+                              <ArrowDown className="h-3.5 w-3.5 text-primary shrink-0" />
+                            )
+                          ) : (
+                            <ArrowUpDown className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                          )}
+                        </button>
+                      ) : (
+                        <span className="font-semibold text-xs text-foreground uppercase tracking-wider">
+                          {getColumnLabel(col.id)}
+                        </span>
+                      )}
                     </div>
                   </TableHead>
                 );

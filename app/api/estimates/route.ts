@@ -94,12 +94,34 @@ export async function GET(request: Request) {
       }
     }
 
+    const sortBy = searchParams.get("sortBy") || "date";
+    const sortOrder = (searchParams.get("sortOrder") || "desc").toLowerCase() === "asc" ? "asc" : "desc";
+
+    let orderBy: any = { date: "desc" };
+    if (sortBy === "number") {
+      orderBy = { number: sortOrder };
+    } else if (sortBy === "date") {
+      orderBy = { date: sortOrder };
+    } else if (sortBy === "amount" || sortBy === "total") {
+      orderBy = { total: sortOrder };
+    } else if (sortBy === "expiryDate" || sortBy === "dueDate") {
+      orderBy = { expiryDate: sortOrder };
+    } else if (sortBy === "status") {
+      orderBy = { status: sortOrder };
+    } else if (sortBy === "customer") {
+      orderBy = { customer: { name: sortOrder } };
+    } else if (sortBy === "poNumber") {
+      orderBy = { poNumber: sortOrder };
+    } else if (sortBy === "salesRep") {
+      orderBy = { salesRep: sortOrder };
+    }
+
     const [estimates, totalCount, aggregateData, acceptedData] = await Promise.all([
       prisma.estimate.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { date: "desc" },
+        orderBy,
         include: {
           customer: {
             select: {
