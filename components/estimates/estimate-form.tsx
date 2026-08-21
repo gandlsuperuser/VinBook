@@ -22,6 +22,7 @@ import {
   calculateSqftFromBoxes,
   calculateLineItemAmount,
 } from "@/lib/flooring-calculator";
+import { getLocalDateString } from "@/lib/utils";
 
 interface EstimateItem {
   id?: string;
@@ -72,8 +73,8 @@ export function EstimateForm({
   const [products, setProducts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     customerId: estimate?.customerId || "",
-    date: estimate?.date || new Date().toISOString().split("T")[0],
-    expiryDate: estimate?.expiryDate || "",
+    date: estimate?.date ? getLocalDateString(estimate.date) : getLocalDateString(),
+    expiryDate: estimate?.expiryDate ? getLocalDateString(estimate.expiryDate) : "",
     status: estimate?.status || EstimateStatus.DRAFT,
     poNumber: estimate?.poNumber || "",
     sideMark: estimate?.sideMark || "",

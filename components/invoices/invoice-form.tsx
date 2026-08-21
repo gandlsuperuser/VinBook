@@ -22,6 +22,7 @@ import {
   calculateSqftFromBoxes,
   calculateLineItemAmount,
 } from "@/lib/flooring-calculator";
+import { getLocalDateString } from "@/lib/utils";
 
 interface InvoiceItem {
   id?: string;
@@ -69,8 +70,12 @@ export function InvoiceForm({ invoice, onSuccess, onCancel }: InvoiceFormProps) 
   const [products, setProducts] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     customerId: invoice?.customerId || "",
-    date: invoice?.date || new Date().toISOString().split("T")[0],
-    dueDate: invoice?.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    date: invoice?.date ? getLocalDateString(invoice.date) : getLocalDateString(),
+    dueDate: invoice?.dueDate ? getLocalDateString(invoice.dueDate) : (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 30);
+      return getLocalDateString(d);
+    })(),
     status: invoice?.status || InvoiceStatus.DRAFT,
     poNumber: invoice?.poNumber || "",
     sideMark: invoice?.sideMark || "",
