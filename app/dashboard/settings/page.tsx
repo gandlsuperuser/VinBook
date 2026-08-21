@@ -11,7 +11,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, Building2, Upload, Trash2, Image as ImageIcon, Database, HardDrive, RefreshCw, CheckCircle2, AlertTriangle, Table2, Layers } from "lucide-react";
+import { Save, Building2, Upload, Trash2, Image as ImageIcon, Database, HardDrive, RefreshCw, CheckCircle2, AlertTriangle, Table2, Layers, Users } from "lucide-react";
+import { TeamManagement } from "@/components/settings/team-management";
 
 interface OrganizationSettings {
   logoUrl?: string;
@@ -438,6 +439,9 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </form>
+
+      {/* Team & User Management Card */}
+      <TeamManagement />
 
       {/* Supabase Database Storage & Usage Card */}
       <Card className="overflow-hidden border shadow-sm">

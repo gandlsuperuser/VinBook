@@ -20,6 +20,8 @@ model User {
   image          String?
   password       String? // Hashed password for email/password auth
   role           UserRole      @default(VIEWER)
+  permissions    Json?         // Custom functional permissions: { invoices, estimates, inventory, banking, expenses, reports, settings }
+  isActive       Boolean       @default(true)
   organizationId String
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime      @default(now())
@@ -77,6 +79,8 @@ model VerificationToken {
 enum UserRole {
   ADMIN
   ACCOUNTANT
+  SALES
+  WAREHOUSE
   VIEWER
 }
 
