@@ -120,6 +120,8 @@ export async function PUT(
       },
       include: {
         payments: true,
+        items: true,
+        customer: true,
       },
     });
 
@@ -154,6 +156,17 @@ export async function PUT(
           },
         });
       }
+    }
+
+    // Restore previous items inventory before applying update
+    if (existingInvoice.items && existingInvoice.items.length > 0) {
+      await restoreInventoryForInvoice({
+        organizationId: user.organizationId,
+        invoiceNumber: existingInvoice.number,
+        customerName: existingInvoice.customer?.name,
+        performedBy: user.name || user.email,
+        items: existingInvoice.items,
+      });
     }
 
     // Update invoice
@@ -198,6 +211,15 @@ export async function PUT(
           },
         },
       },
+    });
+
+    // Deduct inventory for updated items
+    await deductInventoryForInvoice({
+      organizationId: user.organizationId,
+      invoiceNumber: invoice.number,
+      customerName: invoice.customer?.name,
+      performedBy: user.name || user.email,
+      items: validatedData.items,
     });
 
     return NextResponse.json(invoice);

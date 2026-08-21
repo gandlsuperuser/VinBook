@@ -258,7 +258,14 @@ export default function ProductsPage() {
             ) : (
               products.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/dashboard/products/${product.id}`}
+                      className="text-primary hover:underline hover:text-primary/80 font-semibold transition-colors"
+                    >
+                      {product.name}
+                    </Link>
+                  </TableCell>
                   <TableCell>{product.sku || "-"}</TableCell>
                   <TableCell>
                     <span
